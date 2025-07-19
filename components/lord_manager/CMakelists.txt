@@ -1,0 +1,5 @@
+idf_component_register(
+    SRCS "lord_manager.cpp"
+    INCLUDE_DIRS "."
+    REQUIRES enums idevice lamp action_group iinput channel_input panel_input
+)

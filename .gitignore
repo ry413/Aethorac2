@@ -1,0 +1,10 @@
+/build/
+/esp_idf_components/
+.DS_Store
+
+# Prerequisites
+*.cproject
+*.project
+
+# 私密编译期头文件
+/components/my_mqtt/mqtt_secrets.h
