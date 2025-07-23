@@ -2,16 +2,16 @@
 #include "room_state.h"
 #include "manager_base.h"
 
-// void IDevice::change_state(bool state) {
-//     if (cause_state.empty()) {
-//         return;
-//     }
-//     if (state) {
-//         add_state(cause_state);
-//     } else {
-//         remove_state(cause_state);
-//     }
-// }
+void IDevice::change_state(bool state) {
+    if (carry_state.empty()) {
+        return;
+    }
+    if (state) {
+        add_state(carry_state);
+    } else {
+        remove_state(carry_state);
+    }
+}
 
 // void IDevice::sync_link_devices(std::string operation) {
 //     // 如果此时是(进入)某种模式, 就不操控联动设备

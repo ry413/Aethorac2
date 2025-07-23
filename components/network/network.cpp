@@ -222,6 +222,7 @@ static void got_ip_event_handler(void *arg, esp_event_base_t base,
     set_ip_raw(event->ip_info.ip.addr);
     ESP_LOGI(TAG, "Ethernet got IP: " IPSTR, IP2STR(&event->ip_info.ip));
     network_ready = true;
+    printCurrentFreeMemory();
     init_sntp_once();
     mqtt_app_start();
     report_net_state_to_rs485();
@@ -285,6 +286,7 @@ void net_guard_task(void *arg) {
     uint8_t  mqtt_fail  = 0;
     uint64_t first_fail = 0;
 
+    vTaskDelay(3000 / portTICK_PERIOD_MS);  // 联网后等mqtt连接再开guard
     for (;;) {
         if (!mqtt_connected) {
 

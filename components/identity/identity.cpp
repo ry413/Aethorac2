@@ -2,11 +2,12 @@
 #include <cstring>
 #include <esp_partition.h>
 #include <esp_log.h>
+#include <nvs_flash.h>
 #include "identity.h"
 
 #define TAG "IDENTITY"
 
-bool isValidSerial(const char *serial) {
+static bool isValidSerial(const char *serial) {
     if (!serial) return false;
 
     size_t len = strlen(serial);
@@ -57,4 +58,66 @@ const char *getSerialNum() {
     }
 
     return serial_buf;
+}
+
+// 从nvs中获取酒店名与房号
+// 如果某项不存在，则赋予默认值
+void read_room_info_from_nvs(std::string &hotel_name, std::string &room_name) {
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open("storage", NVS_READONLY, &handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "打开 NVS 句柄失败: %s", esp_err_to_name(err));
+        // 打开失败时直接赋默认值
+        hotel_name = "defHotel";
+        room_name = "defRoom";
+        return;
+    }
+
+    size_t required_size = 0;
+    // 读取 hotel_name
+    err = nvs_get_str(handle, "hotel_name", NULL, &required_size);
+    if (err == ESP_OK && required_size > 0) {
+        char *hotel_buf = (char *)malloc(required_size);
+        if (hotel_buf) {
+            err = nvs_get_str(handle, "hotel_name", hotel_buf, &required_size);
+            if (err == ESP_OK) {
+                hotel_name = std::string(hotel_buf);
+            } else {
+                ESP_LOGE(TAG, "读取 hotel_name 失败: %s", esp_err_to_name(err));
+                hotel_name = "DefaultHotelName";
+            }
+            free(hotel_buf);
+        } else {
+            ESP_LOGE(TAG, "分配内存失败");
+            hotel_name = "DefaultHotelName";
+        }
+    } else {
+        ESP_LOGI(TAG, "NVS 中没有找到 hotel_name, 使用默认值");
+        hotel_name = "DefaultHotelName";
+    }
+
+    // 读取 room_name
+    required_size = 0;
+    err = nvs_get_str(handle, "room_name", NULL, &required_size);
+    if (err == ESP_OK && required_size > 0) {
+        char *room_buf = (char *)malloc(required_size);
+        if (room_buf) {
+            err = nvs_get_str(handle, "room_name", room_buf, &required_size);
+            if (err == ESP_OK) {
+                room_name = std::string(room_buf);
+            } else {
+                ESP_LOGE(TAG, "读取 room_name 失败: %s", esp_err_to_name(err));
+                room_name = "DefaultRoomName";
+            }
+            free(room_buf);
+        } else {
+            ESP_LOGE(TAG, "分配内存失败");
+            room_name = "DefaultRoomName";
+        }
+    } else {
+        ESP_LOGI(TAG, "NVS 中没有找到 room_name, 使用默认值");
+        room_name = "DefaultRoomName";
+    }
+
+    nvs_close(handle);
 }

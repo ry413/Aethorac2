@@ -1,65 +1,68 @@
-// #ifndef CURTAIN_H
-// #define CURTAIN_H
+#pragma once
 
-// #include <map>
-// #include <memory>
-// #include <vector>
-// #include "freertos/FreeRTOS.h"
-// #include "freertos/task.h"
-// #include "board_output.h"
-// #include "idevice.h"
-// #include "panel.h"
+#include <map>
+#include <memory>
+#include <vector>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "idevice.h"
+#include "enums.h"
 
-// class Curtain : public IDevice {
-// public:
-//     std::shared_ptr<BoardOutput> output_open;
-//     std::shared_ptr<BoardOutput> output_close;
-//     uint16_t run_duration;
+class Curtain : public IDevice {
+public:
+    Curtain(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t open_ch, uint8_t close_ch, uint64_t runtime)
+        : IDevice(did, DeviceType::CURTAIN, name, carry_state), open_channel(open_ch), close_channel(close_ch), runtime(runtime) {}
 
-//     void execute(std::string operation, std::string parameter, int action_group_id = -1, bool should_log = false) override;
-//     bool getState(void);
+    ~Curtain() {
+        if (actionTaskHandle != nullptr) {
+            vTaskDelete(actionTaskHandle);
+            actionTaskHandle = nullptr;
+        }
+    }
 
-//     ~Curtain() {
-//         if (actionTaskHandle != nullptr) {
-//             vTaskDelete(actionTaskHandle);
-//             actionTaskHandle = nullptr;
-//         }
-//     }
+    void execute(std::string operation, std::string parameter, int action_group_id = -1, bool should_log = false) override;
+    bool getState(void);
 
-//     std::vector<std::weak_ptr<PanelButton>> reverse_buttons;// 关联的按钮, "反转"与"开/关"只会同时存在一种组合
+    void addOpenAssBtn(PanelButtonPair pair) { open_buttons.push_back(pair); }
+    void addCloseAssBtn(PanelButtonPair pair) { close_buttons.push_back(pair); }
 
-//     std::vector<std::weak_ptr<PanelButton>> open_buttons;
-//     std::vector<std::weak_ptr<PanelButton>> close_buttons;
+private:
+    uint8_t open_channel;
+    uint8_t close_channel;
+    uint64_t runtime;
 
-// private:
-//     enum class State { CLOSED, OPEN, OPENING, CLOSING, STOPPED };   // 通常使用的"开/关"控制用的状态
-//     State state = State::CLOSED;
+    // 情况1.两个按键分别开与关
+    enum class State { CLOSED, OPEN, OPENING, CLOSING, STOPPED };
+    State state = State::CLOSED;
+    std::vector<PanelButtonPair> open_buttons;
+    std::vector<PanelButtonPair> close_buttons;
+    
+    // 情况2.一个按键处理开/关, 两种情况只应该存在一种(暂时不实现)
+    std::vector<PanelButtonPair> reverse_buttons;
+    enum class LastAction { NONE, OPENING, CLOSING };
+    LastAction last_action = LastAction::NONE;
 
-//     enum class LastAction { NONE, OPENING, CLOSING };   // 用于, 用一个按键控制窗帘的时候, 即"反转"操作
-//     LastAction last_action = LastAction::NONE;
+    std::vector<PanelButtonPair> action_buttons;               // 当前动作的按钮（开、关或反转）
 
-//     std::vector<std::weak_ptr<PanelButton>> action_buttons;               // 当前动作的按钮（开、关或反转）
+    TaskHandle_t actionTaskHandle = nullptr;  // 任务句柄
 
-//     TaskHandle_t actionTaskHandle = nullptr;  // 任务句柄
+    // 处理"开"操作
+    void handleOpenAction();
 
-//     // 处理"开"操作
-//     void handleOpenAction();
+    // // 处理"关"操作
+    void handleCloseAction();
 
-//     // 处理"关"操作
-//     void handleCloseAction();
+    // // 处理"反转"操作
+    // void handleReverseAction();
 
-//     // 处理"反转"操作
-//     void handleReverseAction();
+    // 打开操作对应的继电器
+    void startAction(uint8_t channel, State newState, std::vector<PanelButtonPair> action_buttons);
 
-//     // 打开操作对应的继电器
-//     void startAction(std::shared_ptr<BoardOutput> channel, State newState, const std::vector<std::weak_ptr<PanelButton>>& action_button);
+    // 停止此时的动作的继电器
+    void stopCurrentAction();
 
-//     // 停止此时的动作的继电器
-//     void stopCurrentAction();
+    // 成功打开/关闭窗帘, 关闭对应继电器, 并熄灭来源按钮的指示灯
+    void completeAction();
 
-//     // 成功打开/关闭窗帘, 关闭对应继电器, 并熄灭来源按钮的指示灯
-//     void completeAction();
-
-//     void updateButtonIndicator(const std::vector<std::weak_ptr<PanelButton>>& button, bool state);
-// };
-// #endif // CURTAIN_H
+    void updateButtonIndicator(std::vector<PanelButtonPair> buttons, bool state);
+};

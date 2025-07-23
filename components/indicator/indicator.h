@@ -1,5 +1,4 @@
-#ifndef INDICATOR_H
-#define INDICATOR_H
+#pragma once
 
 #include <vector>
 #include <unordered_set>
@@ -31,5 +30,3 @@ private:
     IndicatorHolder(const IndicatorHolder&) = delete;
     IndicatorHolder& operator=(const IndicatorHolder&) = delete;
 };
-
-#endif

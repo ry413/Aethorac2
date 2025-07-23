@@ -36,7 +36,7 @@ bool exist_state(const std::string &state) {
     return it != state_array.end();
 }
 
-std::vector<std::string> get_states() {
+std::vector<std::string> getRoomStates() {
     std::lock_guard<std::mutex> lock(state_mutex);
     return state_array;  // 返回副本
 }

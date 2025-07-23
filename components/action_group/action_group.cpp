@@ -13,7 +13,16 @@
 static void executeAllAtomicActionTask(void* pvParameter) {
     ActionGroup* self = static_cast<ActionGroup*>(pvParameter);
 
-    for (const auto& atomic_action : self->atomic_actions) {
+    for (const auto& atomic_action : self->actions) {
+        if (ulTaskNotifyTake(pdTRUE, 0) > 0) {
+            ESP_LOGW(TAG, "任务收到中断通知，中止执行");
+            break;
+        }
+        if (atomic_action.target_device) {
+            atomic_action.target_device->execute(atomic_action.operation, atomic_action.parameter);
+        } else {
+            ESP_LOGE(TAG, "动作组(%d)找不到目标设备", self->getAid());
+        }
         // auto target_ptr = atomic_action.target_device.lock();
         // if (target_ptr) {
         //     target_ptr->execute(atomic_action.operation,
@@ -25,8 +34,8 @@ static void executeAllAtomicActionTask(void* pvParameter) {
         // }
     }
 
+    // 完成动作组, 发布所有已注册的面板按键指示灯更新函数
     IndicatorHolder::getInstance().callAllAndClear();
-
 
     // 如果执行完这个动作组需要上报...那就上报
     if (self->require_report) {
@@ -39,7 +48,7 @@ static void executeAllAtomicActionTask(void* pvParameter) {
     vTaskDelete(nullptr);
 }
 
-void ActionGroup::executeAllAtomicAction(std::string mode_name) {
+void ActionGroup::executeAllAtomicAction() {
     // last_action_group_time = esp_timer_get_time() / 1000ULL;
     // printf("此动作执行于%llu\n", last_action_group_time);
     // 检查是否已有任务在运行
@@ -48,16 +57,16 @@ void ActionGroup::executeAllAtomicAction(std::string mode_name) {
         return;
     }
 
-    std::string current_mode = LordManager::getInstance().getCurrMode();
+    // std::string current_mode = LordManager::getInstance().getCurrMode();
     // 判断执行完后是否要进入某种模式
-    if (!mode_name.empty()) {
-        ESP_LOGI(TAG, "进入[%s]", mode_name.c_str());
+    if (is_mode()) {
+        ESP_LOGI(TAG, "进入模式[%s]", name.c_str());
         // 判断是否从无模式进入某种模式，或者从一种模式切换到另一种模式
-        if (current_mode.empty() || current_mode != mode_name) {
-            LordManager::getInstance().setCurrMode(mode_name);
-            require_report = true;
-            add_log_entry("mode", 0, "进入" + mode_name, "", true);
-        }
+        // if (current_mode.empty() || current_mode != mode_name) {
+        //     LordManager::getInstance().setCurrMode(mode_name);
+        //     require_report = true;
+        //     add_log_entry("mode", 0, "进入" + mode_name, "", true);
+        // }
     }
     // 如果未传入模式
     else {
@@ -94,8 +103,7 @@ void ActionGroup::suicide() {
     // 在销毁此动作组前更新指示灯
     IndicatorHolder::getInstance().callAllAndClear();
     if (task_handle != nullptr) {
-        TaskHandle_t temp_task_handle = task_handle;  // 保存任务句柄
-        task_handle = nullptr;
-        vTaskDelete(temp_task_handle);
+        ESP_LOGI(TAG, "请求中断任务执行");
+        xTaskNotifyGive(task_handle);
     }
 }

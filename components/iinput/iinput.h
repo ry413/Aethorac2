@@ -7,16 +7,16 @@
 
 class InputBase {
 public:
-    InputBase(uint8_t iid, InputType type, const std::string& name, InputTag tag, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
+    InputBase(uint16_t iid, InputType type, const std::string& name, InputTag tag, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
         : iid(iid), type(type), name(name), tag(tag), action_groups(std::move(action_groups)) {}
         
     virtual void execute() = 0;
-    uint8_t getIid() const { return iid; }
+    uint16_t getIid() const { return iid; }
     InputType getType() const { return type; }
     const std::string& getName() const { return name; }
 
 protected:
-    uint8_t iid;
+    uint16_t iid;
     InputType type;
     std::string name;
     InputTag tag;

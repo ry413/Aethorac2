@@ -24,6 +24,7 @@ void handle_response(uart_frame_t *frame) {
 
     switch (frame->cmd_type) {
         case 0x02: // 继电器响应
+            ESP_LOGI(TAG, "继电器查询响应: 板%d 通道%d 当前状态 %d", frame->board_id, frame->channel, frame->param1);
             LordManager::instance().updateChannelState(frame->board_id, frame->channel, frame->param1);
             break;
         case 0x04: // 调光响应
@@ -85,8 +86,8 @@ void handle_response(uart_frame_t *frame) {
             break;
         }
         case 0x09: { // 干接点输入查询响应
-            // ESP_LOGI(TAG, "干接点输出响应：板%d 通道%d 状态 %s", frame->board_id, frame->channel, frame->param1 ? "开" : "关");
-            // if (frame->channel == LordManager::getInstance().getAliveChannel()) {
+            ESP_LOGI(TAG, "干接点输入查询响应: 板%d 通道%d 状态 %s", frame->board_id, frame->channel, frame->param1 ? "开" : "关");
+            // if (frame->channel == LordManager::instance().getAliveChannel()) {
             //     if (frame->param1) {
             //         printf("轮询检测到处于插卡状态, 设置为插卡状态\n");
             //         ESP_LOGI(TAG, "轮询检测到处于插卡状态, 设置为插卡状态");

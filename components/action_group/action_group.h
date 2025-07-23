@@ -20,26 +20,22 @@ struct AtomicAction {
 // 动作组基类
 class ActionGroup {
 public:
-    ActionGroup(uint8_t aid, const std::string& name, bool is_mode, std::vector<AtomicAction> actions)
-        : aid(aid), name(name), mode(is_mode), actions(actions) {}
+    ActionGroup(uint16_t aid, const std::string& name, bool is_mode, std::vector<AtomicAction> actions)
+        : actions(actions), aid(aid), name(name), mode(is_mode) {}
     
-    uint8_t getAid() const { return aid; }
+    uint16_t getAid() const { return aid; }
     const std::string& getName() const { return name; }
     bool is_mode() const { return mode; }
-    uint16_t uid;
-    std::vector<AtomicAction> atomic_actions;
 
-    void executeAllAtomicAction(std::string mode_name);
-
+    void executeAllAtomicAction();
     void clearTaskHandle();
-
     void suicide();
-
+    
     bool require_report = false;        // 表示执行完本动作组后, 是否需要上报状态, 用于情景模式
+    std::vector<AtomicAction> actions;
 private:
-    uint8_t aid;
+    uint16_t aid;
     std::string name;
     bool mode;
-    std::vector<AtomicAction> actions;
     TaskHandle_t task_handle = nullptr;
 };

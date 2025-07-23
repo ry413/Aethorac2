@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-
 #define RS485_UART_PORT   1
 #define RS485_TX_PIN      17
 #define RS485_RX_PIN      5
@@ -13,6 +12,8 @@
 
 #define RS485_FRAME_HEADER 0x7F
 #define RS485_FRAME_FOOTER 0x7E
+#define RS485_CMD_MAX_LEN   8
+#define RS485_QUEUE_LEN     50
 
 #define SWITCH_REPORT       0x00        // 按钮输入
 #define SWITCH_WRITE        0x01        // 控制按钮
@@ -24,13 +25,8 @@
 #define INFRARED_CONTEROLLER 0x77       // 红外控制器, 就是空调遥控
 
 #define ORACLE              0x79        // esp32测试相关
-
+#define ALL_TIME_SYNC       0x78        // 广播时间
 #define VOICE_CONTROL       0x80        // 语音控制
-
-#define ALL_TIME_SYNC       0x78
-
-#define RS485_CMD_MAX_LEN   8
-#define RS485_QUEUE_LEN     50
 
 struct rs485_bus_cmd {
     size_t len;
@@ -43,12 +39,7 @@ void sendRS485CMD(const std::vector<uint8_t>& data);
 void handle_rs485_data(uint8_t* data, int length);
 void generate_response(uint8_t param1, uint8_t param2, uint8_t param3, uint8_t param4, uint8_t param5);
 
-// 心跳包
-extern std::vector<uint8_t> heartbeat_code;
-// 进入醒来的心跳
-void wakeup_heartbeat();
 // 睡觉
-void sleep_heartbeat();
 bool is_sleep();
 // 是否插卡
 void set_alive(bool state);

@@ -1,5 +1,4 @@
-#ifndef ROOM_STATE_H
-#define ROOM_STATE_H
+#pragma once
 
 #include <vector>
 #include <mutex>
@@ -11,6 +10,4 @@ void add_state(const std::string& state);
 bool remove_state(const std::string& state);
 void toggle_state(const std::string &state);
 bool exist_state(const std::string &state);
-std::vector<std::string> get_states();
-
-#endif
+std::vector<std::string> getRoomStates();

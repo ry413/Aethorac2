@@ -9,10 +9,9 @@
 #include "action_group.h"
 #include "manager_base.h"
 // #include "board_config.h"
-#include "board_output.h"
 #include "rs485_comm.h"
-#include "stm32_comm_types.h"
-#include "stm32_tx.h"
+// #include "stm32_comm_types.h"
+// #include "stm32_tx.h"
 #include "lamp.h"
 #include "curtain.h"
 #include "air_conditioner.h"
@@ -152,7 +151,7 @@ void report_op_logs(void) {
 }
 
 void printCurrentFreeMemory(const std::string& msg_head) {
-    ESP_LOGI("Monitor_memory", "%s INTERNAL: %d, DMA: %d", 
+    ESP_LOGI("Monitor_memory", "%s Internal: %d, DMA: %d", 
         msg_head.c_str(), heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_free_size(MALLOC_CAP_DMA));
 }
 
@@ -161,8 +160,8 @@ void urgentPublishDebugLog(const std::string& msg) {
     report_op_logs();
 }
 
-std::vector<int> pavectorseHexToFixedArray(const std::string& hexString) {
-    std::vector<int> result;
+std::vector<uint8_t> pavectorseHexToFixedArray(const std::string& hexString) {
+    std::vector<uint8_t> result;
     size_t len = hexString.length();
 
     if (len % 2 != 0) {
@@ -173,7 +172,7 @@ std::vector<int> pavectorseHexToFixedArray(const std::string& hexString) {
     for (size_t i = 0; i < len; i += 2) {
         std::string byte_str = hexString.substr(i, 2);
         try {
-            int byte = static_cast<int>(std::stoi(byte_str, nullptr, 16));
+            uint8_t byte = static_cast<uint8_t>(std::stoi(byte_str, nullptr, 16));
             result.push_back(byte);
         } catch (const std::invalid_argument& e) {
             ESP_LOGE(TAG, "非法十六进制字符: '%s'", byte_str.c_str());

@@ -32,5 +32,5 @@ void send_frame(uart_frame_t *frame) {
     for (int i = 0; i < frame_size; ++i) {
         pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, "%02X ", data[i]);
     }
-    ESP_LOGI(TAG, "发送帧: %s", hexbuf);
+    ESP_LOGI(TAG, "发送: %s", hexbuf);
 }

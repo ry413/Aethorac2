@@ -1,112 +1,116 @@
-// #include "curtain.h"
+#include <esp_log.h>
+#include "curtain.h"
+#include "lord_manager.h"
+#include "stm32_tx.h"
+#include "indicator.h"
 // #include "commons.h"
 
-// #define TAG "CURTAIN"
+#define TAG "CURTAIN"
 
-// void Curtain::execute(std::string operation, std::string parameter, int action_group_id, bool should_log) {
-//     ESP_LOGI(TAG, "窗帘[%s]收到操作[%s]", name.c_str(), operation.c_str());
-//     if (operation == "打开") {
-//         add_log_entry("cur", uid, operation, parameter, should_log);
-//         handleOpenAction();
-//     } else if (operation == "关闭") {
-//         add_log_entry("cur", uid, operation, parameter, should_log);
-//         handleCloseAction();
-//     } else if (operation == "反转") {
-//         // 反转先不管
-//         handleReverseAction();
-//     }
-//     // 后台管理对窗帘的操作特殊处理
-//     else if (operation == "开") {
-//         switch (state) {
-//             case State::CLOSED:
-//             case State::CLOSING:
-//             case State::STOPPED:
-//                 handleOpenAction();
-//                 break;
-//             default:
-//                 break;
-//         }
-//     } else if (operation == "关") {
-//         switch (state) {
-//             case State::OPEN:
-//             case State::OPENING:
-//             case State::STOPPED:
-//                 handleCloseAction();
-//                 break;
-//             default:
-//                 break;
-//         }
-//     } else if (operation == "停止") {
-//         switch (state) {
-//             case State::CLOSING:
-//             case State::OPENING:
-//                 stopCurrentAction();
-//                 break;
-//             default:
-//                 break;
-//         }
-//     }
-// }
+void Curtain::execute(std::string operation, std::string parameter, int action_group_id, bool should_log) {
+    ESP_LOGI(TAG, "窗帘[%s]收到操作[%s]", name.c_str(), operation.c_str());
+    if (operation == "开") {
+        add_log_entry("cur", did, operation, parameter, should_log);
+        handleOpenAction();
+    } else if (operation == "关") {
+        add_log_entry("cur", did, operation, parameter, should_log);
+        handleCloseAction();
+    } else if (operation == "反转") {
+        // 反转先不管
+        // handleReverseAction();
+    }
+    // // 后台管理对窗帘的操作特殊处理
+    // else if (operation == "开") {
+    //     switch (state) {
+    //         case State::CLOSED:
+    //         case State::CLOSING:
+    //         case State::STOPPED:
+    //             handleOpenAction();
+    //             break;
+    //         default:
+    //             break;
+    //     }
+    // } else if (operation == "关") {
+    //     switch (state) {
+    //         case State::OPEN:
+    //         case State::OPENING:
+    //         case State::STOPPED:
+    //             handleCloseAction();
+    //             break;
+    //         default:
+    //             break;
+    //     }
+    // } else if (operation == "停止") {
+    //     switch (state) {
+    //         case State::CLOSING:
+    //         case State::OPENING:
+    //             stopCurrentAction();
+    //             break;
+    //         default:
+    //             break;
+    //     }
+    // }
+}
 
-// bool Curtain::getState(void) {
-//     switch (state) {
-//         case State::CLOSED:
-//         case State::CLOSING:
-//             return false;
-//         default:
-//             return true;
-//     }
-// }
+bool Curtain::getState(void) {
+    switch (state) {
+        case State::CLOSED:
+        case State::CLOSING:
+            return false;
+        default:
+            return true;
+    }
+}
 
-// void Curtain::handleOpenAction() {
-//     action_buttons = open_buttons;
+void Curtain::handleOpenAction() {
+    action_buttons = open_buttons;
 
-//     if (state == State::OPEN) {
-//         ESP_LOGI(TAG, "[%s]已经彻底打开, 不做任何操作", name.c_str());
-//         // 熄灭指示灯
-//         updateButtonIndicator(action_buttons, false);
-//         return;
-//     } else if (state == State::CLOSED || state == State::STOPPED) {
-//         ESP_LOGI(TAG, "开始打开[%s]...", name.c_str());
-//         startAction(output_open, State::OPENING, action_buttons);
-//         last_action = LastAction::OPENING;
-//     } else if (state == State::OPENING) {
-//         ESP_LOGI(TAG, "停止打开[%s]", name.c_str());
-//         stopCurrentAction();
-//     } else if (state == State::CLOSING) {
-//         ESP_LOGI(TAG, "停止关闭, 开始打开[%s]", name.c_str());
-//         // 熄灭“窗帘关”按钮的指示灯
-//         updateButtonIndicator(close_buttons, false);
-//         stopCurrentAction();
-//         startAction(output_open, State::OPENING, action_buttons);
-//         last_action = LastAction::OPENING;
-//     }
-// }
+    if (state == State::OPEN) {
+        ESP_LOGI(TAG, "[%s]已经彻底打开, 不做任何操作", name.c_str());
+        // 熄灭指示灯
+        updateButtonIndicator(action_buttons, false);
+        return;
+    } else if (state == State::CLOSED || state == State::STOPPED) {
+        ESP_LOGI(TAG, "开始打开[%s]...", name.c_str());
+        startAction(open_channel, State::OPENING, action_buttons);
+        last_action = LastAction::OPENING;
+    } else if (state == State::OPENING) {
+        ESP_LOGI(TAG, "停止打开[%s]", name.c_str());
+        stopCurrentAction();
+    } else if (state == State::CLOSING) {
+        ESP_LOGI(TAG, "停止关闭, 开始打开[%s]", name.c_str());
+        // 熄灭“窗帘关”按钮的指示灯
+        updateButtonIndicator(close_buttons, false);
+        stopCurrentAction();
+        startAction(open_channel, State::OPENING, action_buttons);
+        last_action = LastAction::OPENING;
+    }
+}
 
-// void Curtain::handleCloseAction() {
-//     action_buttons = close_buttons;
+void Curtain::handleCloseAction() {
+    action_buttons = close_buttons;
 
-//     if (state == State::CLOSED) {
-//         ESP_LOGI(TAG, "[%s]已经彻底关闭, 不做任何操作", name.c_str());
-//         // 熄灭指示灯
-//         updateButtonIndicator(action_buttons, false);
-//         return;
-//     } else if (state == State::OPEN || state == State::STOPPED) {
-//         ESP_LOGI(TAG, "开始关闭[%s]...", name.c_str());
-//         startAction(output_close, State::CLOSING, action_buttons);
-//         last_action = LastAction::CLOSING;
-//     } else if (state == State::CLOSING) {
-//         ESP_LOGI(TAG, "停止关闭[%s]", name.c_str());
-//         stopCurrentAction();
-//     } else if (state == State::OPENING) {
-//         ESP_LOGI(TAG, "停止打开, 开始关闭[%s]", name.c_str());
-//         // 熄灭“窗帘开”按钮的指示灯
-//         updateButtonIndicator(open_buttons, false);
-//         stopCurrentAction();
-//         startAction(output_close, State::CLOSING, action_buttons);
-//         last_action = LastAction::CLOSING;
-//     }
-// }
+    if (state == State::CLOSED) {
+        ESP_LOGI(TAG, "[%s]已经彻底关闭, 不做任何操作", name.c_str());
+        // 熄灭指示灯
+        updateButtonIndicator(action_buttons, false);
+        return;
+    } else if (state == State::OPEN || state == State::STOPPED) {
+        ESP_LOGI(TAG, "开始关闭[%s]...", name.c_str());
+        startAction(close_channel, State::CLOSING, action_buttons);
+        last_action = LastAction::CLOSING;
+    } else if (state == State::CLOSING) {
+        ESP_LOGI(TAG, "停止关闭[%s]", name.c_str());
+        stopCurrentAction();
+    } else if (state == State::OPENING) {
+        ESP_LOGI(TAG, "停止打开, 开始关闭[%s]", name.c_str());
+        // 熄灭“窗帘开”按钮的指示灯
+        updateButtonIndicator(open_buttons, false);
+        stopCurrentAction();
+        startAction(close_channel, State::CLOSING, action_buttons);
+        last_action = LastAction::CLOSING;
+    }
+}
 
 // void Curtain::handleReverseAction() {
 //     action_buttons = reverse_buttons;
@@ -146,81 +150,79 @@
 //     }
 // }
 
-// void Curtain::startAction(std::shared_ptr<BoardOutput> output, State newState, const std::vector<std::weak_ptr<PanelButton>>& action_buttons) {
-//     output->connect();
-//     state = newState;
+void Curtain::startAction(uint8_t channel, State newState, const std::vector<PanelButtonPair> action_buttons) {
+    controlRelay(channel, 0x01);
+    state = newState;
 
-//     if (actionTaskHandle != nullptr) {
-//         vTaskDelete(actionTaskHandle);
-//         actionTaskHandle = nullptr;
-//     }
+    if (actionTaskHandle != nullptr) {
+        vTaskDelete(actionTaskHandle);
+        actionTaskHandle = nullptr;
+    }
 
-//     this->action_buttons = action_buttons;
+    this->action_buttons = action_buttons;
 
-//     updateButtonIndicator(action_buttons, true);
+    updateButtonIndicator(action_buttons, true);
 
-//     // 创建新的任务来处理窗帘动作
-//     xTaskCreate([](void* param) {
-//         Curtain* self = static_cast<Curtain*>(param);
-//         // 延时运行时间
-//         vTaskDelay(self->run_duration * 1000 / portTICK_PERIOD_MS);
-//         // 调用完成动作
-//         self->completeAction();
-//         // 任务结束，自动删除
-//         vTaskDelete(nullptr);
-//     }, "CurtainActionTask", 4096, this, 5, &actionTaskHandle);
-// }
+    // 创建新的任务来处理窗帘动作
+    xTaskCreate([](void* param) {
+        Curtain* self = static_cast<Curtain*>(param);
+        // 延时运行时间
+        vTaskDelay(self->runtime * 1000 / portTICK_PERIOD_MS);
+        // 调用完成动作
+        self->completeAction();
+        // 任务结束，自动删除
+        vTaskDelete(nullptr);
+    }, "CurtainActionTask", 4096, this, 5, &actionTaskHandle);
+}
 
-// void Curtain::stopCurrentAction() { 
-//     if (state == State::OPENING) {
-//         output_open->disconnect();
-//     } else if (state == State::CLOSING) {
-//         output_close->disconnect();
-//     }
-//     state = State::STOPPED;
+void Curtain::stopCurrentAction() { 
+    if (state == State::OPENING) {
+        controlRelay(open_channel, false);
+    } else if (state == State::CLOSING) {
+        controlRelay(close_channel, false);
+    }
+    state = State::STOPPED;
 
-//     // 删除正在运行的任务
-//     if (actionTaskHandle != nullptr) {
-//         vTaskDelete(actionTaskHandle);
-//         actionTaskHandle = nullptr;
-//     }
+    // 删除正在运行的任务
+    if (actionTaskHandle != nullptr) {
+        vTaskDelete(actionTaskHandle);
+        actionTaskHandle = nullptr;
+    }
 
-//     // 熄灭指示灯
-//     updateButtonIndicator(action_buttons, false);
-// }
+    // 熄灭指示灯
+    updateButtonIndicator(action_buttons, false);
+}
 
-// void Curtain::completeAction() {
-//     if (state == State::OPENING) {
-//         ESP_LOGI(TAG, "[%s]已打开", name.c_str());
-//         output_open->disconnect();
-//         state = State::OPEN;
-//         // 熄灭指示灯
-//         updateButtonIndicator(action_buttons, false);
-//         // 重置 last_action
-//         last_action = LastAction::NONE;
-//     } else if (state == State::CLOSING) {
-//         ESP_LOGI(TAG, "[%s]已关闭", name.c_str());
-//         output_close->disconnect();
-//         state = State::CLOSED;
-//         // 熄灭指示灯
-//         updateButtonIndicator(action_buttons, false);
-//         // 重置 last_action
-//         last_action = LastAction::NONE;
-//     }
+void Curtain::completeAction() {
+    if (state == State::OPENING) {
+        ESP_LOGI(TAG, "[%s]已打开", name.c_str());
+        controlRelay(open_channel, false);
+        state = State::OPEN;
+        // 熄灭指示灯
+        updateButtonIndicator(action_buttons, false);
+        // 重置 last_action
+        last_action = LastAction::NONE;
+    } else if (state == State::CLOSING) {
+        ESP_LOGI(TAG, "[%s]已关闭", name.c_str());
+        controlRelay(close_channel, false);
+        state = State::CLOSED;
+        // 熄灭指示灯
+        updateButtonIndicator(action_buttons, false);
+        // 重置 last_action
+        last_action = LastAction::NONE;
+    }
 
-//     // 清理任务句柄
-//     actionTaskHandle = nullptr;
-// }
+    // 清理任务句柄
+    actionTaskHandle = nullptr;
+}
 
-// void Curtain::updateButtonIndicator(const std::vector<std::weak_ptr<PanelButton>>& buttons, bool state) {
-//     for (const auto& weak_button : buttons) {
-//         auto button_ptr = weak_button.lock();
-//         if (button_ptr) {
-//             auto panel = button_ptr->host_panel.lock();
-//             if (panel) {
-//                 panel->set_button_bl_state(button_ptr->id, state);
-//                 panel->publish_bl_state();
-//             }
-//         }
-//     }
-// }
+void Curtain::updateButtonIndicator(std::vector<PanelButtonPair> buttons, bool state) {
+    for (auto [pid, bid] : buttons) {
+        if (Panel* panel = LordManager::instance().getPanelByPid(pid)) {
+            panel->updateButtonIndicator(bid, state);
+        }
+    }
+
+    // 窗帘异步运行完成后直接更新按键指示灯
+    IndicatorHolder::getInstance().callAllAndClear();
+}

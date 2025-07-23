@@ -8,3 +8,15 @@ void build_frame(uint8_t cmd_type, uint8_t board_id, uint8_t channel, uint8_t pa
 
 // 发送指令帧
 void send_frame(uart_frame_t *frame);
+
+// 直接发送
+inline void sendStm32Cmd(uint8_t cmd_type, uint8_t board_id, uint8_t channel, uint8_t param1, uint8_t param2) {
+    uart_frame_t frame;
+    build_frame(cmd_type, board_id, channel, param1, param2, &frame);
+    send_frame(&frame);
+}
+
+// 直接操作继电器
+inline void controlRelay(uint8_t channel, uint8_t state) {
+    sendStm32Cmd(CMD_RELAY_CONTROL, 0x00, channel, state, 0x00);
+}

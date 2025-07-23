@@ -10,6 +10,8 @@
 #define STM32_FRAME_HEADER 0x79
 #define STM32_FRAME_FOOTER 0x7C
 
+#define CMD_RELAY_CONTROL 0x01
+
 typedef struct {
     uint8_t header;        // 帧头
     uint8_t cmd_type;      // 命令类型

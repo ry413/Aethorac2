@@ -14,25 +14,9 @@ extern "C" {
 #include <esp_sntp.h>
 #include <esp_log.h>
 
-#define FILE_PATH "/littlefs/rcu_config.ndjson"
-#define LFS_PARTITION_LABEL "fake_lfs"
-
-// 获取字符串格式的序列号
-const char *getSerialNum();
-// 读取本地配置文件
-std::string read_json_to_string(const std::string& filepath);
-// 解析配置文件
-void parseNdJson(const std::string& json_str);
-// 反正也是解析用的
-// std::vector<std::string> splitByLine(const std::string& content);
-// 打印内存
-void printCurrentFreeMemory(const std::string& head = "");
-// 将指令码字符串解析成array
-std::vector<int> pavectorseHexToFixedArray(const std::string& hexString);
-
-// *************** 时间 ***************
-// void init_sntp();
-time_t get_current_timestamp();
+void printCurrentFreeMemory(const std::string& head = "当前内存");  // 打印内存
+std::vector<uint8_t> pavectorseHexToFixedArray(const std::string& hexString);// 将指令码字符串解析成array
+time_t get_current_timestamp();                             // 获取当前时间
 
 // *************** 上报操作日志 ***************
 static std::vector<nlohmann::json> log_array;
