@@ -20,8 +20,10 @@ public:
         }
     }
 
-    void execute(std::string operation, std::string parameter, int action_group_id = -1, bool should_log = false) override;
-    bool getState(void);
+    void execute(std::string operation, std::string parameter, ActionGroup* self_action_group = nullptr, bool should_log = false) override;
+    void addAssBtn(PanelButtonPair) override { ESP_LOGW("Curtain", "窗帘不该使用addAssBtn"); }
+    void syncAssBtnToDevState() override { ESP_LOGW("Curtain", "窗帘不该使用syncAssBtnToDevState"); }
+    bool isOn() const override;
 
     void addOpenAssBtn(PanelButtonPair pair) { open_buttons.push_back(pair); }
     void addCloseAssBtn(PanelButtonPair pair) { close_buttons.push_back(pair); }
@@ -49,7 +51,7 @@ private:
     // 处理"开"操作
     void handleOpenAction();
 
-    // // 处理"关"操作
+    // 处理"关"操作
     void handleCloseAction();
 
     // // 处理"反转"操作
@@ -64,5 +66,6 @@ private:
     // 成功打开/关闭窗帘, 关闭对应继电器, 并熄灭来源按钮的指示灯
     void completeAction();
 
+    void updateButtonIndicator(bool state) override { ESP_LOGW("Curtain", "窗帘不应该调用这个函数"); }
     void updateButtonIndicator(std::vector<PanelButtonPair> buttons, bool state);
 };

@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "json_codec.cpp"
     INCLUDE_DIRS "."
-    PRIV_REQUIRES lord_manager identity action_group curtain esp_timer air_conditioner room_state
+    PRIV_REQUIRES yyjson lord_manager indicator identity action_group curtain esp_timer air_conditioner room_state
 )

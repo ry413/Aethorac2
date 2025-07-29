@@ -1,5 +1,5 @@
 idf_component_register(
     SRCS "channel_input.cpp"
     INCLUDE_DIRS "."
-    REQUIRES enums action_group iinput
+    PRIV_REQUIRES enums action_group iinput commons lord_manager esp_timer
 )

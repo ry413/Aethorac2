@@ -4,14 +4,13 @@
 
 #include "stm32_comm_types.h"
 #include "stm32_rx.h"
-#include "stm32_tx.h"
 #include "rs485_comm.h"
-// #include "board_config.h"
-// #include "manager_base.h"
 #include "room_state.h"
 #include "lord_manager.h"
 
 #define TAG "STM32_RX"
+
+bool global_STM32_log_enable_flag = false;
 
 // 打印数据包的内容
 static void print_response(const uart_frame_t *frame) {
@@ -20,91 +19,83 @@ static void print_response(const uart_frame_t *frame) {
 }
 
 void handle_response(uart_frame_t *frame) {
-    print_response(frame);
+    if (global_STM32_log_enable_flag) {
+        print_response(frame);
+    }
 
     switch (frame->cmd_type) {
-        case 0x02: // 继电器响应
-            ESP_LOGI(TAG, "继电器查询响应: 板%d 通道%d 当前状态 %d", frame->board_id, frame->channel, frame->param1);
-            LordManager::instance().updateChannelState(frame->board_id, frame->channel, frame->param1);
+        case CMD_RELAY_QUERY: // 继电器响应
+            LordManager::instance().updateRelayPhysicsState(frame->channel, frame->param1);
             break;
         case 0x04: // 调光响应
-            ESP_LOGI(TAG, "调光响应：板%d 通道%d 当前亮度 %d", frame->board_id, frame->channel, frame->param1);
+            ESP_LOGI(TAG, "调光响应：通道%d 当前亮度 %d", frame->channel, frame->param1);
             break;
-        case 0x07: { // 干接点输入上报
-            uint8_t board_id = frame->board_id;
+        case CMD_DRYCONTACT_INPUT: { // 干接点输入上报
             uint8_t channel_num = frame->channel;
             uint8_t state = frame->param1;
-
-            LordManager::instance().executeInputAction(board_id, channel_num, state);
-
-            // // 测试模式拦截输入
+            
+            // 测试模式拦截输入
             // if (is_test_mode()) {
             //     uart_frame_t frame;
-            //     build_frame(0x01, board_id, channel_num, state, 0x00, &frame);
+            //     build_frame(0x01, 0x00, channel_num, state, 0x00, &frame);
             //     send_frame(&frame);
             //     return;
             // }
 
+            static auto& lord = LordManager::instance();
+            // 因为配置上可以为一个输入通道配置无限个配置行, 所以一个通道号会对应多个ChannelInput实例
+            auto channel_input_ptrs = lord.getAllChannelInputByChannelNum(channel_num);
+            if (channel_input_ptrs.empty()) {
+                ESP_LOGW(TAG, "未配置输入通道[%u]", channel_num);
+                return;
+            }
 
+            // 检测此通道是否能在拔卡时使用
+            InputTag tag = channel_input_ptrs.front()->getTag();
+            if (!lord.getAlive() && tag == InputTag::NONE) {
+                ESP_LOGI(TAG, "输入[%d], 在拔卡时拒绝响应", channel_num);
+                return;
+            }
 
-            // if (!get_alive()) {
-            //     uint8_t alive_channel = LordManager::getInstance().getAliveChannel();
-            //     uint8_t door_channel = LordManager::getInstance().getDoorChannel();
-            //     if (channel_num != alive_channel && channel_num != door_channel) {
-            //         ESP_LOGI(TAG, "输入[%d] 非alive_channel[%d], 非door_channel[%d], 拒绝响应", channel_num, alive_channel, door_channel);
-            //         return;
-            //     }
-            // }
-            
-            // // 遍历所有指定通道的BoardInput, 也就是说, 有可能有多个channel不同的BoardInput, 这里要执行所有同为指定通道的输出
-            // auto& all_boards = BoardManager::getInstance().getAllItems();
-            // for (const auto& [board_id, board] : all_boards) {
-            //     auto& inputs = board->inputs;
-            //     for (auto& input : inputs) {
-            //         // 找到目标通道
-            //         if (input.channel == channel_num) {
-            //             // 判断此输入类型
-            //             if (input.type != InputType::INFRARED) {
-            //                 // 如果不是红外的话, 就执行指定电平的行为
-            //                 InputType input_level;
-            //                 if (state == 0x01) {
-            //                     input_level = InputType::HIGH;
-            //                 } else {
-            //                     input_level = InputType::LOW;
-            //                 }
-            //                 if (input.type == input_level) {
-            //                     input.execute();
-            //                 }
-            //             }
-            //             // 否则当然是进入红外逻辑了
-            //             else {
-            //                 input.execute_infrared(state);
-            //             }
-            //         }
-            //     }
-            // }
+            // 是门磁的话就更新门状态
+            if (tag == InputTag::IS_DOOR_CHANNEL) {
+                if (state) {
+                    lord.onDoorClosed();
+                } else {
+                    lord.onDoorOpened();
+                }
+            }
+            // 是门铃的话要判断处不处于勿扰状态
+            else if (tag == InputTag::IS_DOORBELL_CHANNEL) {
+                if (exist_state("勿扰")) {
+                    return;
+                }
+            }
+
+            // 执行它
+            for (auto* channel_input_ptr : channel_input_ptrs) {
+                if (channel_input_ptr->trigger_type == TriggerType::LOW_LEVEL ||
+                    channel_input_ptr->trigger_type == TriggerType::HIGH_LEVEL) {
+                    TriggerType input_type;
+                    if (state == 0x01) {
+                        input_type = TriggerType::HIGH_LEVEL;
+                    } else {
+                        input_type = TriggerType::LOW_LEVEL;
+                    }
+                    if (channel_input_ptr->trigger_type == input_type) {
+                        channel_input_ptr->execute();
+                    }
+                } else if (channel_input_ptr->trigger_type == TriggerType::INFRARED) {
+                    channel_input_ptr->execute_infrared(state);
+                }
+            }
             break;
         }
-        case 0x09: { // 干接点输入查询响应
-            ESP_LOGI(TAG, "干接点输入查询响应: 板%d 通道%d 状态 %s", frame->board_id, frame->channel, frame->param1 ? "开" : "关");
-            // if (frame->channel == LordManager::instance().getAliveChannel()) {
-            //     if (frame->param1) {
-            //         printf("轮询检测到处于插卡状态, 设置为插卡状态\n");
-            //         ESP_LOGI(TAG, "轮询检测到处于插卡状态, 设置为插卡状态");
-            //         set_alive(true);
-            //         add_state("入住");
-
-            //     } else if (frame->param1 == 0x00) {
-            //         printf("轮询检测到处于拔卡状态, 再次进行拔卡动作组\n");
-            //         ESP_LOGI(TAG, "轮询检测到处于拔卡状态, 再次进行拔卡动作组");
-            //         uart_frame_t remove_card_cmd;
-            //         build_frame(0x07, frame->board_id, frame->channel, frame->param1, 0x00, &remove_card_cmd);
-            //         handle_response(&remove_card_cmd);
-            //     }
-            // }
+        case CMD_DRYCONTACT_INPUT_RESPONSE: { // 干接点输入查询响应
+            LordManager::instance().updateDrycontactInputPhysicsState(frame->channel, frame->param1);
             break;
         }
-        case 0xFF: { // 查询版本号的响应
+        case CMD_VERSION_RESPONSE: { // 查询版本号的响应
             uint8_t firmware_ver_1 = frame->board_id;
             uint8_t firmware_ver_2 = frame->channel;
             uint8_t board_ver_1 = frame->param1;

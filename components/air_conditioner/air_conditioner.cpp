@@ -5,6 +5,9 @@
 #include <memory>
 #include <atomic>
 #include "esp_log.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/timers.h>
 
 #include "air_conditioner.h"
 #include "lord_manager.h"
@@ -33,27 +36,27 @@ void AirConBase::update_state(uint8_t state, uint8_t temps) {
     room_temp.store(room_temp_val);
 
     // 拔卡状态并且拔卡时不允许操作空调
-    if (!LordManager::instance().getAlive() && !AirConManager::getInstance().remove_card_air_usable) { 
+    if (!LordManager::instance().getAlive() && !AirConGlobalConfig::getInstance().remove_card_air_usable) { 
         return;
     }
 
     // 上报空调操作
     if (power == 0x00 && is_running.load() == true) {
-        add_log_entry("air", did, "关闭", "", true);        // 因为是用户操控温控器面板, 所以传true让它记录日志
+        add_log_entry("air", did, "关闭", "");        // 因为是用户操控温控器面板, 所以传true让它记录日志
     } else if (power == 0x01 && is_running.load() == false) {
-        add_log_entry("air", did, "打开", "", true);
+        add_log_entry("air", did, "打开", "");
     }
 
     if (mode.load() != bitsToMode(mode_bits)) {
-        add_log_entry("air", did, modeBitsToName(mode_bits), "", true);
+        add_log_entry("air", did, modeBitsToName(mode_bits), "");
     }
 
     if (fan_speed.load() != bitsToFanSpeed(fan_speed_bits)) {
-        add_log_entry("air", did, fanSpeedBitsToName(fan_speed_bits), "", true);
+        add_log_entry("air", did, fanSpeedBitsToName(fan_speed_bits), "");
     }
 
     if (target_temp_val != target_temp.load()) {
-        add_log_entry("air", did, "调整至" + std::to_string(target_temp_val) + "度", "", true);
+        add_log_entry("air", did, "调整至" + std::to_string(target_temp_val) + "度", "");
     }
 
     // 更新模式
@@ -68,9 +71,9 @@ void AirConBase::update_state(uint8_t state, uint8_t temps) {
 }
 
 // 另一种操控空调的方式, 比如语音控制, 后台控制
-void SinglePipeFCU::execute(std::string operation, std::string parameter, int action_group_id, bool should_log) {
+void SinglePipeFCU::execute(std::string operation, std::string parameter, ActionGroup* self_action_group, bool should_log) {
     add_log_entry("air", did, operation, parameter, should_log);
-    ESP_LOGI(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
+    ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
 
     // 直接处理关闭
     if (operation == "关闭") {
@@ -79,8 +82,9 @@ void SinglePipeFCU::execute(std::string operation, std::string parameter, int ac
         return;
     }
 
-    // 否则固定进入on状态
+    // 否则固定进入on状态, 并把可能存在的"shutdownAfter"定时器关掉
     is_running.store(true);
+    xTimerStop(shutdown_after_timer, 0);
 
     if (operation == "制冷") {
         mode.store(ACMode::COOLING);
@@ -131,71 +135,11 @@ void SinglePipeFCU::execute(std::string operation, std::string parameter, int ac
     sync_states();
 }
 
-void SinglePipeFCU::execute_backstage(std::string operation, std::string parameter) {
-    ESP_LOGI(TAG, "后台控制: 空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
-
-    if (operation == "关闭") {
-        power_off();
-        sync_states();
-        return;
-    }
-
-    is_running.store(true);
-
-    if (operation == "制冷") {
-        mode.store(ACMode::COOLING);
-    } else if (operation == "制热") {
-        mode.store(ACMode::HEATING);
-    } else if (operation == "通风") {
-        mode.store(ACMode::FAN);
-    } else if (operation == "高风") {
-        fan_speed.store(ACFanSpeed::HIGH);
-    } else if (operation == "中风") {
-        fan_speed.store(ACFanSpeed::MEDIUM);
-    } else if (operation == "低风") {
-        fan_speed.store(ACFanSpeed::LOW);
-    } else if (operation == "自动") {
-        fan_speed.store(ACFanSpeed::AUTO);
-    } else if (operation == "风量加大") {
-        if (fan_speed.load() == ACFanSpeed::LOW) {
-            fan_speed.store(ACFanSpeed::MEDIUM);
-        } else if (fan_speed.load() == ACFanSpeed::MEDIUM) {
-            fan_speed.store(ACFanSpeed::HIGH);
-        }
-    } else if (operation == "风量减小") {
-        if (fan_speed.load() == ACFanSpeed::HIGH) {
-            fan_speed.store(ACFanSpeed::MEDIUM);
-        } else if (fan_speed.load() == ACFanSpeed::MEDIUM) {
-            fan_speed.store(ACFanSpeed::LOW);
-        }
-    } else if (operation == "温度升高") {
-        uint8_t current_temp = target_temp.load();
-        if (current_temp < 30) {
-            target_temp.store(current_temp + 1);
-        }
-    } else if (operation == "温度降低") {
-        uint8_t current_temp = target_temp.load();
-        if (current_temp > 16) {
-            target_temp.store(current_temp - 1);
-        }
-    } else if (operation == "调节温度") {
-        int temp = std::stoi(parameter);
-        
-        temp = std::max(16, std::min(temp, 31));
-        
-        ESP_LOGI(TAG, "调节温度至%d\n", temp);
-        target_temp.store(static_cast<uint8_t>(temp));
-    }
-
-    adjust_relay_states();
-    sync_states();
-}
-
 // 处理温控器持续上报来的状态
 void SinglePipeFCU::update_state(uint8_t state, uint8_t temps) {
     AirConBase::update_state(state, temps);
     
-    if (!LordManager::instance().getAlive() && !AirConManager::getInstance().remove_card_air_usable) { 
+    if (!LordManager::instance().getAlive() && !AirConGlobalConfig::getInstance().remove_card_air_usable) { 
         return;
     }
 
@@ -203,6 +147,7 @@ void SinglePipeFCU::update_state(uint8_t state, uint8_t temps) {
         power_off();
     } else {
         is_running.store(true);
+        xTimerStop(shutdown_after_timer, 0);
         adjust_relay_states();
     }
     sync_states();
@@ -223,20 +168,57 @@ void SinglePipeFCU::sync_states() {
     temps |= ((target_temp.load() - 16) & 0x0F) << 4;
     temps |= ((room_temp.load() - 16) & 0x0F) << 0;
 
-    generate_response(AIR_CON, 0xA1, 0x00, state, temps);
+    generate_response(AIR_CON, AIR_CON_CONTROL, 0x00, state, temps);
+}
+
+void SinglePipeFCU::staticShutdownAfterTimerCallback(TimerHandle_t xTimer) {
+    void* pv = pvTimerGetTimerID(xTimer);
+    if (SinglePipeFCU* pThis = static_cast<SinglePipeFCU*>(pv)) {
+        pThis->shutdownAfterTimerCallback(xTimer);
+    }
+}
+
+void SinglePipeFCU::shutdownAfterTimerCallback(TimerHandle_t xTimer) {
+    controlRelay(mid_channel, false);
+    controlRelay(high_channel, false);
+    controlRelay(low_channel, false);
 }
 
 void SinglePipeFCU::power_off() {
     AirConBase::power_off();
-    controlRelay(low_channel, false);
-    controlRelay(mid_channel, false);
-    controlRelay(high_channel, false);
+    
+    // 固定关闭水阀
     controlRelay(water1_channel, false);
+    // 关闭除了目标之外的风机
+    auto& air_configs = AirConGlobalConfig::getInstance();
+    switch (air_configs.shutdown_after_fan_speed) {
+        case ACFanSpeed::LOW:
+            controlRelay(low_channel, true);
+            controlRelay(mid_channel, false);
+            controlRelay(high_channel, false);
+            break;
+        case ACFanSpeed::MEDIUM:
+            controlRelay(low_channel, false);
+            controlRelay(mid_channel, true);
+            controlRelay(high_channel, false);
+            break;
+        case ACFanSpeed::HIGH:
+            controlRelay(low_channel, false);
+            controlRelay(mid_channel, false);
+            controlRelay(high_channel, true);
+            break;
+        default:
+            ESP_LOGE(TAG, "shutdown_after_fan_speed错误: %d", (int)air_configs.shutdown_after_fan_speed);
+            break;
+    }
+
+    xTimerStart(shutdown_after_timer, 0);
+
 }
 
 // 根据当前温度差值, 开关水阀
 void SinglePipeFCU::adjust_relay_states() {
-    auto& airConManager = AirConManager::getInstance();
+    auto& airConManager = AirConGlobalConfig::getInstance();
     uint8_t target_temp_value = target_temp.load();
 
     switch (mode.load()) {
@@ -298,7 +280,7 @@ void SinglePipeFCU::adjust_relay_states() {
 
 // 根据当前温度差值, 调节风机
 void SinglePipeFCU::adjust_fan_relay() {
-    auto& airConManager = AirConManager::getInstance();
+    auto& airConManager = AirConGlobalConfig::getInstance();
 
     // 如果是自动风
     if (fan_speed.load() == ACFanSpeed::AUTO) {
@@ -357,7 +339,7 @@ void SinglePipeFCU::open_fan_relay(ACFanSpeed speed) {
 
 // 达到目标温度后的停止动作
 void SinglePipeFCU::stop_on_reached_target() {
-    auto stop_action = AirConManager::getInstance().stop_action;
+    auto stop_action = AirConGlobalConfig::getInstance().stop_action;
 
     switch (stop_action) {
         case ACStopAction::CLOSE_ALL:
@@ -386,9 +368,9 @@ void AirConBase::power_off() {
     ESP_LOGI(TAG, "空调%d已关闭", ac_id);
 }
 
-void InfraredAC::execute(std::string operation, std::string parameter, int action_group_id, bool should_log) {
+void InfraredAC::execute(std::string operation, std::string parameter, ActionGroup* self_action_group, bool should_log) {
     add_log_entry("air", did, operation, parameter, should_log);
-    ESP_LOGI(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
+    ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
 
     if (operation == "关闭") {
         power_off();
@@ -398,65 +380,6 @@ void InfraredAC::execute(std::string operation, std::string parameter, int actio
 
     is_running.store(true);
 
-    if (operation == "制冷") {
-        mode.store(ACMode::COOLING);
-    } else if (operation == "制热") {
-        mode.store(ACMode::HEATING);
-    } else if (operation == "通风") {
-        mode.store(ACMode::FAN);
-    } else if (operation == "高风") {
-        fan_speed.store(ACFanSpeed::HIGH);
-    } else if (operation == "中风") {
-        fan_speed.store(ACFanSpeed::MEDIUM);
-    } else if (operation == "低风") {
-        fan_speed.store(ACFanSpeed::LOW);
-    } else if (operation == "自动") {
-        fan_speed.store(ACFanSpeed::AUTO);
-    } else if (operation == "风量加大") {
-        if (fan_speed.load() == ACFanSpeed::LOW) {
-            fan_speed.store(ACFanSpeed::MEDIUM);
-        } else if (fan_speed.load() == ACFanSpeed::MEDIUM) {
-            fan_speed.store(ACFanSpeed::HIGH);
-        }
-    } else if (operation == "风量减小") {
-        if (fan_speed.load() == ACFanSpeed::HIGH) {
-            fan_speed.store(ACFanSpeed::MEDIUM);
-        } else if (fan_speed.load() == ACFanSpeed::MEDIUM) {
-            fan_speed.store(ACFanSpeed::LOW);
-        }
-    } else if (operation == "温度升高") {
-        uint8_t current_temp = target_temp.load();
-        if (current_temp < 30) {
-            target_temp.store(current_temp + 1);
-        }
-    } else if (operation == "温度降低") {
-        uint8_t current_temp = target_temp.load();
-        if (current_temp > 16) {
-            target_temp.store(current_temp - 1);
-        }
-    } else if (operation == "调节温度") {
-        int temp = std::stoi(parameter);
-        
-        temp = std::max(16, std::min(temp, 31));
-        
-        ESP_LOGI(TAG, "调节温度至%d\n", temp);
-        target_temp.store(static_cast<uint8_t>(temp));
-    }
-
-    sync_states();
-}
-
-void InfraredAC::execute_backstage(std::string operation, std::string parameter) {
-    ESP_LOGI(TAG, "后台控制: 空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
-
-    if (operation == "关闭") {
-        power_off();
-        sync_states();
-        return;
-    }
-    
-    is_running.store(true);
-    
     if (operation == "制冷") {
         mode.store(ACMode::COOLING);
     } else if (operation == "制热") {
@@ -508,7 +431,7 @@ void InfraredAC::execute_backstage(std::string operation, std::string parameter)
 void InfraredAC::update_state(uint8_t state, uint8_t temps) {
     AirConBase::update_state(state, temps);
     
-    if (!LordManager::instance().getAlive() && !AirConManager::getInstance().remove_card_air_usable) { 
+    if (!LordManager::instance().getAlive() && !AirConGlobalConfig::getInstance().remove_card_air_usable) { 
         return;
     }
     
@@ -534,7 +457,7 @@ void InfraredAC::sync_states() {
     temps |= ((target_temp.load() - 16) & 0x0F) << 4;
     temps |= ((room_temp.load() - 16) & 0x0F) << 0;
 
-    generate_response(AIR_CON, 0xA1, 0x00, state, temps);
+    generate_response(AIR_CON, AIR_CON_CONTROL, 0x00, state, temps);
     // generate_response(AIR_CON, 0x08, 0x00, state, temps);
 }
 

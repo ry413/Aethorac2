@@ -19,7 +19,7 @@
 #define SWITCH_WRITE        0x01        // 控制按钮
 
 #define AIR_CON             0x16        // 设备类型: 空调
-#define AIR_CON_INQUIRE     0xA0        // 空调查询
+#define AIR_CON_INQUIRE     0xA2        // 空调查询
 #define AIR_CON_CONTROL     0xA1        // 空调控制
 #define AIR_CON_REPORT      0x08        // 空调响应
 #define INFRARED_CONTEROLLER 0x77       // 红外控制器, 就是空调遥控
@@ -33,17 +33,14 @@ struct rs485_bus_cmd {
     uint8_t data[RS485_CMD_MAX_LEN];
 };
 
+extern bool global_RS485_log_enable_flag;
+
 void uart_init_rs485();
 uint8_t calculate_checksum(const std::vector<uint8_t>& data);
 void sendRS485CMD(const std::vector<uint8_t>& data);
 void handle_rs485_data(uint8_t* data, int length);
 void generate_response(uint8_t param1, uint8_t param2, uint8_t param3, uint8_t param4, uint8_t param5);
 
-// 睡觉
-bool is_sleep();
-// 是否插卡
-void set_alive(bool state);
-bool get_alive();
 // 是否是测试模式
 bool is_test_mode();
 // 报告网络状态到485里, 只有我那个脚本可以处理

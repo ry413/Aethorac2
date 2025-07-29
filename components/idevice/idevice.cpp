@@ -1,6 +1,10 @@
+#include <esp_log.h>
 #include "idevice.h"
 #include "room_state.h"
-#include "manager_base.h"
+#include "lord_manager.h"
+#include "stm32_tx.h"
+
+#define TAG "IDEVICE"
 
 void IDevice::change_state(bool state) {
     if (carry_state.empty()) {
@@ -13,24 +17,31 @@ void IDevice::change_state(bool state) {
     }
 }
 
-// void IDevice::sync_link_devices(std::string operation) {
-//     // 如果此时是(进入)某种模式, 就不操控联动设备
-//     if (!LordManager::getInstance().getCurrMode().empty()) {
-//         return;
-//     }
-//     operated_flag = true;  // 标记为已被动过
-//     for (auto link_uid : link_device_uids) {
-//         auto device = DeviceManager::getInstance().getItem(link_uid);
-//         // 只操作未被操作的
-//         if (!device->is_operated()) {
-//             device->execute(operation, "");
-//         }
-//     }
-//     operated_flag = false;  // 在这里重置标记
-// }
+void IDevice::sync_link_devices(std::string operation, bool should_log) {
+    static auto& lord = LordManager::instance();
 
-// void IDevice::close_repel_devices(void) {
-//     for (auto repel_uid : repel_device_uids) {
-//         DeviceManager::getInstance().getItem(repel_uid)->execute("关闭", "");
-//     }
-// }
+    // 如果should_log是false, 说明此时正在执行某种情景模式, 那就不操控联动设备
+    if (!should_log) {
+        return;
+    }
+
+    operated_flag = true;  // 标记为已被动过
+    for (auto link_did : link_dids) {
+        if (IDevice* dev = lord.getDeviceByDid(link_did)) {
+            if (!dev->isOperated()) {
+                dev->execute(operation, "", nullptr, should_log);
+            }
+        }
+    }
+    operated_flag = false;  // 在这里重置标记
+}
+
+void IDevice::close_repel_devices(void) {
+    static auto& lord = LordManager::instance();
+
+    for (auto repel_did : repel_dids) {
+        if (IDevice* dev = lord.getDeviceByDid(repel_did)) {
+            dev->execute("关", "");
+        }
+    }
+}

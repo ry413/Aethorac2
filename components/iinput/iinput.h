@@ -14,6 +14,7 @@ public:
     uint16_t getIid() const { return iid; }
     InputType getType() const { return type; }
     const std::string& getName() const { return name; }
+    InputTag getTag() const { return tag; }
 
 protected:
     uint16_t iid;

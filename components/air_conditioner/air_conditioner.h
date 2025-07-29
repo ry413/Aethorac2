@@ -3,6 +3,10 @@
 #include <map>
 #include <memory>
 #include <atomic>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/timers.h"
+#include "action_group.h"
 #include "idevice.h"
 
 enum class ACFanSpeed : uint8_t {
@@ -32,19 +36,17 @@ enum class ACStopAction: uint8_t {
 };
 
 
-// 空调管理者
-// 不掌管空调, 只是操控
-class AirConManager {
+// 空调的全局配置, 就只是储存一些数据
+class AirConGlobalConfig {
 public:
-    static AirConManager& getInstance() {
-        static AirConManager instance;
+    static AirConGlobalConfig& getInstance() {
+        static AirConGlobalConfig instance;
         return instance;
     }
 
-    AirConManager(const AirConManager&) = delete;
-    AirConManager& operator=(const AirConManager&) = delete;
+    AirConGlobalConfig(const AirConGlobalConfig&) = delete;
+    AirConGlobalConfig& operator=(const AirConGlobalConfig&) = delete;
 
-    // 空调的全局设置
     uint8_t default_target_temp;        // 默认目标温度
     ACMode default_mode;                // 默认模式
     ACFanSpeed default_fan_speed;       // 默认风速
@@ -55,29 +57,34 @@ public:
     uint8_t low_diff;                   // 风速: 自动时, 进入低风所需小于等于的温差
     uint8_t high_diff;                  // 温差大于等于以进入高风
     ACFanSpeed auto_fun_wind_speed;     // (风速: AUTO, 模式: 通风) 这个状态时, 应该开什么风速
+    uint16_t shutdown_after_duration;   // 盘管空调关机后还要吹的时长
+    ACFanSpeed shutdown_after_fan_speed;// 盘管空调关机后还要吹的风速
 private:
-    AirConManager() = default;
+    AirConGlobalConfig() = default;
 };
 
 class AirConBase : public IDevice {
 public:
     AirConBase(uint16_t did, const std::string& name, const std::string&carry_state, uint8_t ac_id, DeviceType dev_type, ACType ac_type)
         : IDevice(did, dev_type, name, carry_state), ac_id(ac_id), ac_type(ac_type) {
-            auto& airConManager = AirConManager::getInstance();
+            auto& airConManager = AirConGlobalConfig::getInstance();
             target_temp.store(airConManager.default_target_temp);
             fan_speed.store(airConManager.default_fan_speed);
             mode.store(airConManager.default_mode);
         }
-    
+    void addAssBtn(PanelButtonPair) override { ESP_LOGW("AirConBase", "空调不应该添加关联按钮"); }
+    void syncAssBtnToDevState() override { ESP_LOGW("AirConBase", "空调不应该有关联按钮"); }
+    bool isOn() const override { return is_running.load(); }
+    void updateButtonIndicator(bool state) override { ESP_LOGW("AirConBase", "空调不应该调用这个函数"); }
+
     virtual void update_state(uint8_t state, uint8_t temps);
-    virtual void execute_backstage(std::string operation, std::string parameter) = 0;
+    virtual void sync_states() = 0;
 
     uint8_t getAcId() const { return ac_id; }
     ACMode get_mode() const { return mode.load(); }
     ACFanSpeed get_fan_speed() const { return fan_speed.load(); }
     uint8_t get_target_temp() const { return target_temp.load(); }
     uint8_t get_room_temp() const { return room_temp.load(); }
-    bool get_state() const { return is_running.load(); }
     void update_room_temp(uint8_t temp) { room_temp.store(temp); }
 
 protected:
@@ -99,12 +106,28 @@ public:
     SinglePipeFCU(uint16_t did, const std::string& name, const std::string&carry_state,
                   uint8_t ac_id, uint8_t water1_ch, uint8_t low_ch, uint8_t mid_ch, uint8_t high_ch)
         : AirConBase(did, name, carry_state, ac_id, DeviceType::SINGLE_AIR, ACType::SINGLE_PIPE_FCU),
-          water1_channel(water1_ch), low_channel(low_ch), mid_channel(mid_ch), high_channel(high_ch) {}
+          water1_channel(water1_ch), low_channel(low_ch), mid_channel(mid_ch), high_channel(high_ch) {
+            if (!shutdown_after_timer) {
+                shutdown_after_timer = xTimerCreate(
+                    "shutdownAfterTimer",
+                    pdMS_TO_TICKS(AirConGlobalConfig::getInstance().shutdown_after_duration * 1000),
+                    pdFALSE,
+                    this,
+                    staticShutdownAfterTimerCallback
+                );
+            }
+        }
+    ~SinglePipeFCU() {
+        if (shutdown_after_timer != nullptr) {
+            xTimerStop(shutdown_after_timer, 0);
+            xTimerDelete(shutdown_after_timer, 0);
+            shutdown_after_timer = nullptr;
+        }
+    }
 
-    void execute(std::string operation, std::string parameter, int action_group_id = -1, bool should_log = false) override;
-    void execute_backstage(std::string operation, std::string parameter) override;
+    void execute(std::string operation, std::string parameter, ActionGroup* self_action_group = nullptr, bool should_log = false) override;
     void update_state(uint8_t state, uint8_t temps) override;
-    void sync_states();
+    void sync_states() override;
 
 protected:
     uint8_t water1_channel;
@@ -113,6 +136,10 @@ protected:
     uint8_t high_channel;
 
 private:
+    TimerHandle_t shutdown_after_timer = nullptr;
+    static void staticShutdownAfterTimerCallback(TimerHandle_t xTimer);
+    void shutdownAfterTimerCallback(TimerHandle_t xTimer);
+
     void power_off() override;
     void adjust_relay_states();
     void adjust_fan_relay();
@@ -131,10 +158,10 @@ class InfraredAC : public AirConBase {
 public:
     InfraredAC(uint16_t did, const std::string& name, const std::string&carry_state, uint8_t ac_id)
         : AirConBase(did, name, carry_state, ac_id, DeviceType::INFRARED_AIR, ACType::INFRARED) {}
-    void execute(std::string operation, std::string parameter, int action_group_id = -1, bool should_log = false) override;
-    void execute_backstage(std::string operation, std::string parameter) override;
+    void execute(std::string operation, std::string parameter, ActionGroup* self_action_group = nullptr, bool should_log = false) override;
     void update_state(uint8_t state, uint8_t temps) override;
-    void sync_states();
+    void sync_states() override;
+
     void set_code_base(std::string code_base);
     std::string get_code_base() const;
 

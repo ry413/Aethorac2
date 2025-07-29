@@ -3,12 +3,11 @@
 #include "lord_manager.h"
 #include "stm32_tx.h"
 #include "indicator.h"
-// #include "commons.h"
 
 #define TAG "CURTAIN"
 
-void Curtain::execute(std::string operation, std::string parameter, int action_group_id, bool should_log) {
-    ESP_LOGI(TAG, "窗帘[%s]收到操作[%s]", name.c_str(), operation.c_str());
+void Curtain::execute(std::string operation, std::string parameter, ActionGroup* self_action_group, bool should_log) {
+    ESP_LOGI_CYAN(TAG, "窗帘[%s]收到操作[%s]", name.c_str(), operation.c_str());
     if (operation == "开") {
         add_log_entry("cur", did, operation, parameter, should_log);
         handleOpenAction();
@@ -52,7 +51,7 @@ void Curtain::execute(std::string operation, std::string parameter, int action_g
     // }
 }
 
-bool Curtain::getState(void) {
+bool Curtain::isOn(void) const {
     switch (state) {
         case State::CLOSED:
         case State::CLOSING:
@@ -216,13 +215,13 @@ void Curtain::completeAction() {
     actionTaskHandle = nullptr;
 }
 
+// 窗帘异步运行完成后直接更新按键指示灯
 void Curtain::updateButtonIndicator(std::vector<PanelButtonPair> buttons, bool state) {
-    for (auto [pid, bid] : buttons) {
+    for (const auto [pid, bid] : buttons) {
         if (Panel* panel = LordManager::instance().getPanelByPid(pid)) {
-            panel->updateButtonIndicator(bid, state);
+            panel->wishIndicatorByButton(bid, state);
         }
     }
 
-    // 窗帘异步运行完成后直接更新按键指示灯
     IndicatorHolder::getInstance().callAllAndClear();
 }

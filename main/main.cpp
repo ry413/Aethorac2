@@ -9,17 +9,11 @@
 #include "nvs_flash.h"
 #include "esp_core_dump.h"
 #include "esp_netif.h"
-
-// #include <string>
 #include "rs485_comm.h"
 #include "stm32_rx.h"
 #include "network.h"
 #include "stm32_tx.h"
-// #include "action_group.h"
-// #include "esp_timer.h"
-// #include <stm32_comm_types.h>
-// #include <stm32_tx.h>
-// #include <manager_base.h>
+#include "lord_manager.h"
 
 #include "commons.h"
 #include "identity.h"
@@ -90,6 +84,10 @@ extern "C" void app_main(void) {
     esp_netif_init();
     
     xTaskCreate([] (void *param) {
+        LordManager::instance().syncAllRelayPhysicsOnoff();
+        LordManager::instance().syncAllDrycontactInputPhysicsOnoff();
+        vTaskDelay(pdMS_TO_TICKS(2000));
+
         printCurrentFreeMemory("开始解析配置");
         parseLocalLogicConfig();
         printCurrentFreeMemory("开始联网");

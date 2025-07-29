@@ -136,7 +136,7 @@ static void init_sntp_once(void)
 
 // ========== Wi-Fi 重连定时器 ==========
 static void reconnect_cb(void *arg) {
-    ESP_LOGI(TAG, "定时器触发, 尝试 Wi-Fi 重连");
+    printf("定时器触发, 尝试 Wi-Fi 重连\n");
     esp_wifi_connect();
 }
 
@@ -165,14 +165,14 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         mqtt_app_stop();
 
         if (!esp_timer_is_active(reconnect_timer)) {
-            ESP_LOGW(TAG, "Wi-Fi 掉线, 5 秒后重连");
+            printf("Wi-Fi 掉线, 5 秒后重连\n");
             esp_timer_start_once(reconnect_timer, 5000000);  // 5 s
         }
     }
     else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
         set_ip_raw(event->ip_info.ip.addr);
-        ESP_LOGI(TAG, "Wi-Fi got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+        printf("Wi-Fi got IP: %d.%d.%d.%d\n", IP2STR(&event->ip_info.ip));
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         network_ready = true;
         init_sntp_once();
@@ -196,7 +196,7 @@ static void eth_event_handler(void *arg, esp_event_base_t base,
         case ETHERNET_EVENT_CONNECTED:
             link_up = true;
             esp_eth_ioctl(handle, ETH_CMD_G_MAC_ADDR, mac_addr);
-            ESP_LOGI(TAG, "Ethernet Link Up: %02x:%02x:%02x:%02x:%02x:%02x",
+            printf("Ethernet Link Up: %02x:%02x:%02x:%02x:%02x:%02x\n",
                      mac_addr[0], mac_addr[1], mac_addr[2],
                      mac_addr[3], mac_addr[4], mac_addr[5]);
             break;
@@ -220,9 +220,8 @@ static void got_ip_event_handler(void *arg, esp_event_base_t base,
                                  int32_t id, void *data) {
     ip_event_got_ip_t *event = (ip_event_got_ip_t *)data;
     set_ip_raw(event->ip_info.ip.addr);
-    ESP_LOGI(TAG, "Ethernet got IP: " IPSTR, IP2STR(&event->ip_info.ip));
+    printf("Ethernet got IP: %d.%d.%d.%d\n", IP2STR(&event->ip_info.ip));
     network_ready = true;
-    printCurrentFreeMemory();
     init_sntp_once();
     mqtt_app_start();
     report_net_state_to_rs485();
@@ -269,10 +268,17 @@ void start_wifi_network(void) {
     EventBits_t bits = xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT,
                                            true, true, pdMS_TO_TICKS(10000));
     if (!(bits & WIFI_CONNECTED_BIT)) {
-        ESP_LOGE(TAG, "Wi-Fi 连接超时");
+        printf("Wi-Fi 连接超时\n");
         generate_response(ORACLE, 0x09, 0x01, 0xEE, 0x00);  // 报告超时
     } else {
-        ESP_LOGI(TAG, "Wi-Fi 连接成功");
+        printf("Wi-Fi 连接成功\n");
+    }
+}
+
+void swPhyReset() {
+    printf("对LAN8720A进行软复位\n");
+    if (mac != nullptr) {
+        mac->write_phy_reg(mac, 1, 0x00, 0x8000);
     }
 }
 
@@ -286,14 +292,13 @@ void net_guard_task(void *arg) {
     uint8_t  mqtt_fail  = 0;
     uint64_t first_fail = 0;
 
-    vTaskDelay(3000 / portTICK_PERIOD_MS);  // 联网后等mqtt连接再开guard
     for (;;) {
         if (!mqtt_connected) {
 
             /* -------- 应用层：先让 MQTT 自动重连 -------- */
             if (++mqtt_fail <= APP_RETRY_LIMIT) {
                 if (!first_fail) first_fail = esp_timer_get_time()/1000;
-                ESP_LOGW(TAG, "[%u/%u] 等待 MQTT 自动重连…",
+                printf("[%u/%u] 等待 MQTT 自动重连…\n",
                          mqtt_fail, APP_RETRY_LIMIT);
                 goto delay;
             }
@@ -302,21 +307,21 @@ void net_guard_task(void *arg) {
             if (esp_timer_get_time()/1000 - first_fail > APP_RETRY_WINDOW_MS) {
                 mqtt_fail  = 1;
                 first_fail = esp_timer_get_time()/1000;
-                ESP_LOGW(TAG, "重新开始 MQTT 失败计数");
+                printf("重新开始 MQTT 失败计数\n");
                 goto delay;
             }
 
             /* -------- 驱动层：重启 ETH -------- */
             uint64_t now = esp_timer_get_time()/1000;
             if (now - last_eth_restart_ms < ETH_RESTART_COOLDOWN_MS) {
-                ESP_LOGW(TAG, "ETH 冷却中… %llu ms",
+                printf("ETH 冷却中… %llu ms\n",
                          ETH_RESTART_COOLDOWN_MS - (now - last_eth_restart_ms));
                 goto delay;
             }
 
-            ESP_LOGE(TAG, "MQTT 连续失败，重启以太网 (第 %u 次)",
+            printf("MQTT 连续失败，重启以太网 (第 %u 次)\n",
                      ++eth_restart_times);
-
+            swPhyReset();
             esp_eth_stop(eth_handle);
             vTaskDelay(pdMS_TO_TICKS(300));      // PHY 彻底停
             esp_eth_start(eth_handle);
@@ -326,7 +331,7 @@ void net_guard_task(void *arg) {
 
             /* -------- MCU 级：多次 ETH 仍失败 → 重启芯片 -------- */
             if (eth_restart_times >= MCU_REBOOT_AFTER_N_ETH) {
-                ESP_LOGE(TAG, "ETH 重启 %u 次无果，触发 esp_restart()",
+                printf("ETH 重启 %u 次无果, 无力回天, 触发 esp_restart()\n",
                          eth_restart_times);
                 esp_restart();
             }
@@ -363,6 +368,8 @@ void start_ethernet_network(void) {
     mac = esp_eth_mac_new_esp32(&mac_cfg, &eth_mac_cfg);
     if (!mac) { ESP_LOGE(TAG, "MAC 初始化失败"); return; }
 
+    swPhyReset();
+
     ESP_LOGD(TAG, "Initializing Ethernet PHY (LAN8720A) for WT32-ETH01...");
     eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
     phy_config.phy_addr = 1;
@@ -370,12 +377,13 @@ void start_ethernet_network(void) {
     phy = esp_eth_phy_new_lan87xx(&phy_config);
 
     ESP_ERROR_CHECK(gpio_set_direction(GPIO_NUM_16, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_16, 0));
+    vTaskDelay(pdMS_TO_TICKS(50));
     ESP_ERROR_CHECK(gpio_set_level(GPIO_NUM_16, 1));
     vTaskDelay(pdMS_TO_TICKS(50));
 
     esp_eth_config_t eth_cfg = ETH_DEFAULT_CONFIG(mac, phy);
     eth_handle = nullptr;
-    // ESP_ERROR_CHECK(esp_eth_driver_install(&eth_cfg, &eth_handle));
     esp_eth_driver_install(&eth_cfg, &eth_handle);
 
     /* 2. netif + glue */
@@ -391,9 +399,7 @@ void start_ethernet_network(void) {
                                                &got_ip_event_handler, nullptr));
                                                
     /* 4. 启动 */
-    // ESP_ERROR_CHECK(esp_eth_start(eth_handle));
     esp_eth_start(eth_handle);
-    // xTaskCreatePinnedToCore(net_guard_task, "net_guard_task", 2048, nullptr, 4, nullptr, 0);
     ESP_LOGI(TAG, "Ethernet started");
 }
 
@@ -430,24 +436,11 @@ net_type_t network_current_type(void) { return current_net_type; }
 void set_ip_raw(uint32_t ip) { ip_raw = ip; }
 uint32_t get_ip_raw(void)    { return ip_raw; }
 
-/* 改网口 + 重启 */
 void change_network_type_and_reboot(net_type_t new_type) {
     store_network_type(new_type);
     ESP_LOGW(TAG, "已写入新网络类型 %d, 即将重启...", new_type);
-    vTaskDelay(pdMS_TO_TICKS(1000));   // 给日志一点时间
-    esp_restart();
+    xTaskCreate([](void *param) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        esp_restart();
+    }, "system_suicide_task", 4096, nullptr, 3, nullptr);
 }
-
-
-void bomb_task(void *arg) {
-    static uint8_t big[1500];
-    for (int i = 0; i < 2000; i++) {
-        for (int i = 0; i < 4; i++) {
-            esp_eth_transmit(eth_handle, big, sizeof(big));
-        }
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
-    vTaskDelete(nullptr);
-}
-
-

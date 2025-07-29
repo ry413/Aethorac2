@@ -27,10 +27,12 @@ void send_frame(uart_frame_t *frame) {
     uart_write_bytes(UART_NUM, (const char *)data, frame_size);
 
     // 打印发送的数据
-    char hexbuf[frame_size * 3 + 1];
-    int pos = 0;
-    for (int i = 0; i < frame_size; ++i) {
-        pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, "%02X ", data[i]);
+    if (global_STM32_log_enable_flag) {
+        char hexbuf[frame_size * 3 + 1];
+        int pos = 0;
+        for (int i = 0; i < frame_size; ++i) {
+            pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, "%02X ", data[i]);
+        }
+        ESP_LOGI(TAG, "发送: %s", hexbuf);
     }
-    ESP_LOGI(TAG, "发送: %s", hexbuf);
 }

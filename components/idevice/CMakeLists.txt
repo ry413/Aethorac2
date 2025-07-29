@@ -1,3 +1,4 @@
 idf_component_register(SRCS "idevice.cpp"
                        INCLUDE_DIRS "."
-                       REQUIRES enums room_state manager_base commons)
+                       PRIV_REQUIRES enums room_state
+                       REQUIRES commons lord_manager)

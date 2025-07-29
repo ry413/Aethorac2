@@ -3,30 +3,23 @@
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
-// #include "freertos/timers.h"
 #include "esp_timer.h"
 #include "driver/uart.h"
 #include "esp_log.h"
 
 #include "rs485_comm.h"
 #include "lord_manager.h"
-
-
-
-// #include "manager_base.h"
 #include "commons.h"
 #include "network.h"
 #include "air_conditioner.h"
-// #include "panel.h"
-#include "stm32_comm_types.h"
 #include "stm32_tx.h"
-// #include "board_config.h"
+#include "stm32_rx.h"
 #include "network.h"
+#include "identity.h"
 
 #define TAG "RS485"
 
-// std::vector<uint8_t> heartbeat_code;
-// static bool alive_state = false;   // 是否插卡, 决定rcu是否活着, 是否允许响应按钮
+bool global_RS485_log_enable_flag = false;
 
 // 测试模式
 static bool test_mode = false;
@@ -75,7 +68,8 @@ void uart_init_rs485() {
     // 心跳任务
     xTaskCreate([] (void* param) {
         while (true) {
-            sendRS485CMD(LordManager::instance().getHeartbeatCode());
+            std::array<uint8_t, 8> code = LordManager::instance().getHeartbeatCode();
+            sendRS485CMD(std::vector<uint8_t>(code.begin(), code.end()));
             vTaskDelay(200 / portTICK_PERIOD_MS);
         }
     }, "495ALIVE task", 2048, NULL, 3, NULL);
@@ -150,19 +144,6 @@ void sendRS485CMD(const std::vector<uint8_t>& data) {
     }
 }
 
-// bool is_sleep() {
-//     return heartbeat_code == pavectorseHexToFixedArray("7FC0FFFF00003D7E");
-// }
-
-// void set_alive(bool state) {
-//     ESP_LOGI(TAG, "%s", state ? "进入插卡状态" : "进入拔卡状态");
-//     alive_state = state;
-// }
-
-// bool get_alive() {
-//     return alive_state;
-// }
-
 bool is_test_mode() {
     return test_mode;
 }
@@ -175,7 +156,7 @@ uint8_t calculate_checksum(const std::vector<uint8_t>& data) {
     return checksum & 0xFF;
 }
 
-// // 终极处理函数
+// 终极处理函数
 void handle_rs485_data(uint8_t* data, int length) {
     uint8_t checksum = calculate_checksum(std::vector<uint8_t>(data, data + 6));
     if (data[6] != checksum) {
@@ -188,13 +169,16 @@ void handle_rs485_data(uint8_t* data, int length) {
         ESP_LOGE(TAG, "数据包: %s", hexbuf);
         return;
     }
-    char hexbuf[8 * 3 + 1];
-    int pos = 0;
-    for (size_t i = 0; i < 8; ++i) {
-        pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, "%02X ", data[i]);
-    }
-    ESP_LOGI(TAG, "收到: %s", hexbuf);
 
+    if (global_RS485_log_enable_flag) {
+        char hexbuf[8 * 3 + 1];
+        int pos = 0;
+        for (size_t i = 0; i < 8; ++i) {
+            pos += snprintf(hexbuf + pos, sizeof(hexbuf) - pos, "%02X ", data[i]);
+        }
+        ESP_LOGI(TAG, "收到: %s", hexbuf);
+    }
+        
     // ******************** 判断功能码 ********************
 
     // 开关上报
@@ -381,32 +365,9 @@ void handle_rs485_data(uint8_t* data, int length) {
                 }
             case 0x06:  // 控制干接点输入
                 if (is_test_mode()) {
-                    // auto& all_boards = BoardManager::getInstance().getAllItems();
-                    // for (const auto& [board_id, board] : all_boards) {
-                    //     auto& inputs = board->inputs;
-                    //     for (auto& input : inputs) {
-                    //         // 找到目标通道
-                    //         if (input.channel == data[4]) {
-                    //             // 判断此输入类型
-                    //             if (input.type != InputType::INFRARED) {
-                    //                 // 如果不是红外的话, 就执行指定电平的行为
-                    //                 InputType input_level;
-                    //                 if (data[5] == 0x01) {
-                    //                     input_level = InputType::HIGH;
-                    //                 } else {
-                    //                     input_level = InputType::LOW;
-                    //                 }
-                    //                 if (input.type == input_level) {
-                    //                     input.execute();
-                    //                 }
-                    //             }
-                    //             // 否则当然是进入红外逻辑了
-                    //             else {
-                    //                 input.execute_infrared(data[5]);
-                    //             }
-                    //         }
-                    //     }
-                    // }
+                    uart_frame_t frame;
+                    build_frame(CMD_DRYCONTACT_INPUT, 0x00, data[4], data[5], 0x00, &frame);
+                    handle_response(&frame);
                     break;
                 }
             case 0x07:  // 调光控制
@@ -419,13 +380,10 @@ void handle_rs485_data(uint8_t* data, int length) {
                     if (data[5] == 0x01) {
                         ESP_LOGI(TAG, "切换至WiFi");
                         generate_response(ORACLE, 0x09, 0x01, 0x00, 0x00);
-                        
-                        // start_wifi_network();
                         change_network_type_and_reboot(NET_TYPE_WIFI);
                     } else if (data[5] == 0x02) {
                         ESP_LOGI(TAG, "切换至以太网");
                         generate_response(ORACLE, 0x09, 0x02, 0x00, 0x00);
-                        // start_ethernet_network();
                         change_network_type_and_reboot(NET_TYPE_ETHERNET);
                     } else if (data[5] == 0x00) {
                         ESP_LOGI(TAG, "遭到查询, 返回网络状态");
@@ -436,8 +394,16 @@ void handle_rs485_data(uint8_t* data, int length) {
             case 0x0A:  // 查固件版本
                 if (is_test_mode()) {
                     uint8_t maj = 0, min = 0, pat = 0;
-                    // sscanf(AETHORAC_VERSION, "%hhu.%hhu.%hhu", &maj, &min, &pat);
                     generate_response(ORACLE, 0x0A, maj, min, pat);
+                    break;
+                }
+            case 0x0B:  // 开关stm32的RX/TX打印
+                if (is_test_mode()) {
+                    if (data[4] == 0x00) {
+                        global_STM32_log_enable_flag = data[5];
+                    } else if (data[4] == 0x01) {
+                        global_RS485_log_enable_flag = data[5];
+                    }
                     break;
                 }
             // 上面一堆奇怪的break是故意的, 为了fall到这里来
@@ -470,63 +436,63 @@ void generate_response(uint8_t param1, uint8_t param2, uint8_t param3, uint8_t p
 }
 
 void report_net_state_to_rs485() {
-//     // 1. 获取IP地址
-//     uint32_t ip_raw = get_ip_raw();
+    // 1. 获取IP地址
+    uint32_t ip_raw = get_ip_raw();
 
-//     // 2. 获取序列号（字符串）
-//     const char *serial_str = getSerialNum();
+    // 2. 获取序列号（字符串）
+    const char *serial_str = getSerialNum();
 
-//     // 3. 序列号转成uint32_t（8位数字）
-//     uint32_t serial_num = (uint32_t)strtoul(serial_str, NULL, 10);
+    // 3. 序列号转成uint32_t（8位数字）
+    uint32_t serial_num = (uint32_t)strtoul(serial_str, NULL, 10);
 
-//     // 4. 拆成字节
-//     uint8_t seq_bytes[4] = {
-//         (uint8_t)((serial_num >> 24) & 0xFF),
-//         (uint8_t)((serial_num >> 16) & 0xFF),
-//         (uint8_t)((serial_num >> 8) & 0xFF),
-//         (uint8_t)(serial_num & 0xFF)
-//     };
+    // 4. 拆成字节
+    uint8_t seq_bytes[4] = {
+        (uint8_t)((serial_num >> 24) & 0xFF),
+        (uint8_t)((serial_num >> 16) & 0xFF),
+        (uint8_t)((serial_num >> 8) & 0xFF),
+        (uint8_t)(serial_num & 0xFF)
+    };
 
-//     uint8_t ip_bytes[4] = {
-//         (uint8_t)(ip_raw & 0xFF),
-//         (uint8_t)((ip_raw >> 8) & 0xFF),
-//         (uint8_t)((ip_raw >> 16) & 0xFF),
-//         (uint8_t)((ip_raw >> 24) & 0xFF)
-//     };
+    uint8_t ip_bytes[4] = {
+        (uint8_t)(ip_raw & 0xFF),
+        (uint8_t)((ip_raw >> 8) & 0xFF),
+        (uint8_t)((ip_raw >> 16) & 0xFF),
+        (uint8_t)((ip_raw >> 24) & 0xFF)
+    };
 
-//     // 5. 获取当前网络类型
-//     uint8_t net_type_byte = 0x00;
-//     switch (network_current_type()) {
-//         case NET_TYPE_WIFI: net_type_byte = 0x01; break;
-//         case NET_TYPE_ETHERNET: net_type_byte = 0x02; break;
-//         default:
-//             net_type_byte = 0x00;
-//             ESP_LOGE(TAG, "预期之外的网络类型: %d", network_current_type());
-//             break;
-//     }
+    // 5. 获取当前网络类型
+    uint8_t net_type_byte = 0x00;
+    switch (network_current_type()) {
+        case NET_TYPE_WIFI: net_type_byte = 0x01; break;
+        case NET_TYPE_ETHERNET: net_type_byte = 0x02; break;
+        default:
+            net_type_byte = 0x00;
+            ESP_LOGE(TAG, "预期之外的网络类型: %d", network_current_type());
+            break;
+    }
 
-//     // 6. 构造发送包（14字节）
-//     uint8_t frame[14] = {
-//         0x7F, 0x79,          // header
-//         0x11,                // type
-//         seq_bytes[0], seq_bytes[1], seq_bytes[2], seq_bytes[3],
-//         ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3],
-//         net_type_byte,       // 网络类型
-//         0x00,                // checksum 占位
-//         0x7E                 // tail
-//     };
+    // 6. 构造发送包（14字节）
+    uint8_t frame[14] = {
+        0x7F, 0x79,          // header
+        0x11,                // type
+        seq_bytes[0], seq_bytes[1], seq_bytes[2], seq_bytes[3],
+        ip_bytes[0], ip_bytes[1], ip_bytes[2], ip_bytes[3],
+        net_type_byte,       // 网络类型
+        0x00,                // checksum 占位
+        0x7E                 // tail
+    };
 
-//     // 7. 计算校验和
+    // 7. 计算校验和
     
-//     uint8_t checksum = 0;
-//     for (int i = 0; i < 12; ++i) checksum += frame[i];
-//     frame[12] = checksum & 0xFF;
+    uint8_t checksum = 0;
+    for (int i = 0; i < 12; ++i) checksum += frame[i];
+    frame[12] = checksum & 0xFF;
 
-//     // 8. 发送
-//     uart_write_bytes(UART_NUM_1, (const char*)frame, sizeof(frame));
-//     ESP_LOGI("ORACLE", "发送设备状态包 (网络类型: %s)",
-//              net_type_byte == 0x01 ? "WiFi" :
-//              net_type_byte == 0x02 ? "Ethernet" : "None");
+    // 8. 发送
+    uart_write_bytes(UART_NUM_1, (const char*)frame, sizeof(frame));
+    ESP_LOGI("ORACLE", "发送设备状态包 (网络类型: %s)",
+             net_type_byte == 0x01 ? "WiFi" :
+             net_type_byte == 0x02 ? "Ethernet" : "None");
 }
 
 // 测试模式中的一个loop

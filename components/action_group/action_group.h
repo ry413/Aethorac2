@@ -31,7 +31,6 @@ public:
     void clearTaskHandle();
     void suicide();
     
-    bool require_report = false;        // 表示执行完本动作组后, 是否需要上报状态, 用于情景模式
     std::vector<AtomicAction> actions;
 private:
     uint16_t aid;

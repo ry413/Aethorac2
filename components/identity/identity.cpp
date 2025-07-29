@@ -4,6 +4,7 @@
 #include <esp_log.h>
 #include <nvs_flash.h>
 #include "identity.h"
+#include "commons.h"
 
 #define TAG "IDENTITY"
 
@@ -34,7 +35,7 @@ const char *getSerialNum() {
         );
         if (!part) {
             ESP_LOGE(TAG, "serial_num分区不存在");
-            // urgentPublishDebugLog("serial_num分区不存在");
+            urgentPublishDebugLog("serial_num分区不存在");
             return "";
         }
 
@@ -42,7 +43,7 @@ const char *getSerialNum() {
                                            serial_buf, SERIAL_LEN);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "读取serial_num分区失败, err=0x%x", err);
-            // urgentPublishDebugLog("读取serial_num分区失败");
+            urgentPublishDebugLog("读取serial_num分区失败");
             return "";
         }
 
@@ -50,7 +51,7 @@ const char *getSerialNum() {
 
         if (!isValidSerial(serial_buf)) {
             ESP_LOGW(TAG, "无效或缺失的serial number: '%s'", serial_buf);
-            // urgentPublishDebugLog("无效或缺失的serial number");
+            urgentPublishDebugLog("无效或缺失的serial number");
             serial_buf[0] = '\0';
         }
 

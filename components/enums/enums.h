@@ -1,26 +1,23 @@
 #pragma once
 
-// enum class InputType {
-//     LOW_LEVEL,
-//     HIGH_LEVEL,
-//     INFRARED
-// };
 // 这个理应与Laminor2的DeviceType顺序一样
 enum class DeviceType {
-    LAMP,
-    CURTAIN,
-    INFRARED_AIR,
-    SINGLE_AIR,
-    RS485,
-    RELAY,
-    DRY_CONTACT,
+  LAMP,
+  CURTAIN,
+  INFRARED_AIR,
+  SINGLE_AIR,
+  RS485,
+  RELAY,
+  DRY_CONTACT,
+  DOORBELL,
 
-    // 预设设备类型
-    HEARTBEAR,
-    ROOM_STATE,
-    DELAYER,
-    ACTION_GROUP_OP,
-    SNAPSHOT
+  // 预设设备类型
+  HEARTBEAT,
+  ROOM_STATE,
+  DELAYER,
+  ACTION_GROUP_OP,
+  SNAPSHOT,
+  INDICATOR
 };
 
 // 这些也是

@@ -13,7 +13,6 @@
 
 #include "mqtt_secrets.h"
 #include "stm32_tx.h"
-// #include "room_state.h"
 #include "lord_manager.h"
 #include "indicator.h"
 #include "commons.h"
@@ -103,9 +102,6 @@ static void report_state_task(void *param) {
 
         vTaskDelay(60000 / portTICK_PERIOD_MS);
         runtime_counter++;
-
-        UBaseType_t remaining_stack = uxTaskGetStackHighWaterMark(NULL);
-        ESP_LOGI(__func__, "Remaining stack size: %u", remaining_stack);
     }
     vTaskDelete(nullptr);
 }
@@ -320,11 +316,19 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                     std::string dev_type = msg.value("devicetype", "");
                     uint16_t dev_did = static_cast<uint16_t>(std::stoi(msg.value("deviceid", "-1")));
                     std::string operation = msg.value("operation", "");
-                    std::string parameter = msg.value("parameter", "");
+                    std::string parameter;
+                    if (msg.contains("parameter")) {
+                        if (msg["parameter"].is_string()) {
+                            parameter = msg["parameter"];
+                        } else if (msg["parameter"].is_number()) {
+                            parameter = std::to_string(msg["parameter"].get<int>());
+                        }
+                    }
 
                     if (dev_type == "mode") {
                         for (auto* mode : LordManager::instance().getAllModeActionGroup()) {
                             if (mode->getName() == operation) {
+                                ESP_LOGI_CYAN(TAG, "后台调用[%s]", mode->getName().c_str());
                                 mode->executeAllAtomicAction();
                             }
                         }
@@ -512,10 +516,10 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
             
                         xTaskCreate([](void *param) {
                             printCurrentFreeMemory();
-                            vTaskDelay(5000 / portTICK_PERIOD_MS);
+                            vTaskDelay(3000 / portTICK_PERIOD_MS);
                             printCurrentFreeMemory();
                             parseLocalLogicConfig();
-                            vTaskDelay(300 / portTICK_PERIOD_MS);   // 等物理查询结果
+                            vTaskDelay(2000 / portTICK_PERIOD_MS);   // 等物理查询结果
                             register_the_rcu();
                             vTaskDelete(nullptr);
                         }, "parsejson", 8192, nullptr, 3, nullptr);
