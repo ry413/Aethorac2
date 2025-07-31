@@ -135,7 +135,7 @@ static void report_after_ota(void) {
             app->app_elf_sha256[2],
             app->app_elf_sha256[3]);
     sha8[8] = '\0';
-
+    
     char msg[256];
     snprintf(msg, sizeof(msg),
             "OTA_OK | part=%s | ver=%s | sha=%.8s | build=%s %s | "
@@ -148,7 +148,7 @@ static void report_after_ota(void) {
             (st==ESP_OTA_IMG_PENDING_VERIFY)?"PENDING":
             (st==ESP_OTA_IMG_INVALID)?"INVALID":"ABORTED",
             esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
-
+    printf("OTA-POST: %s\n", msg);
     ESP_LOGI("OTA-POST", "%s", msg);
     is_first = false;
 }
@@ -180,14 +180,13 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             xTaskCreate(report_operation_task, "report_operation_task", 8192, nullptr, 3, &report_op_task_handle);
         }
 
-        // U>N>OWEN
-        // if (!orig_vprintf) {
-        //     orig_vprintf = esp_log_set_vprintf(my_log_send_func);
-        // } else {
-        //     esp_log_set_vprintf(my_log_send_func);
-        // }
+        if (!orig_vprintf) {
+            orig_vprintf = esp_log_set_vprintf(my_log_send_func);
+        } else {
+            esp_log_set_vprintf(my_log_send_func);
+        }
         ESP_LOGI(TAG, "日志已重定向至mqtt");
-        
+        vTaskDelay(pdMS_TO_TICKS(100));
         report_after_ota();
         break;
     }

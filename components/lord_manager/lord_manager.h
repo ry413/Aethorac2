@@ -56,6 +56,7 @@ public:
     ActionGroup* getActionGroupByAid(uint16_t aid);
     std::vector<ActionGroup*> getAllModeActionGroup();
     std::vector<ChannelInput*> getAllChannelInputByChannelNum(uint8_t channel_num);// 返回所有指定channel的实例
+    ChannelInput* getAliveChannel();
     Panel* getPanelByPid(uint8_t pid);
 
     // ================ 心跳包 ================

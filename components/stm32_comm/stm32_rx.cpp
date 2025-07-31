@@ -7,6 +7,7 @@
 #include "rs485_comm.h"
 #include "room_state.h"
 #include "lord_manager.h"
+#include "stm32_tx.h"
 
 #define TAG "STM32_RX"
 
@@ -63,6 +64,16 @@ void handle_response(uart_frame_t *frame) {
                     lord.onDoorClosed();
                 } else {
                     lord.onDoorOpened();
+                }
+
+                // 如果插拔卡通道是红外类型, 门磁动作就会当作是检测到了一下
+                auto* alive_channel = lord.getAliveChannel();
+                if (alive_channel && (alive_channel->trigger_type == TriggerType::INFRARED ||
+                    alive_channel->trigger_type == TriggerType::INFRARED_TIMEOUT)) {
+                        vTaskDelay(pdMS_TO_TICKS(50));
+                        uart_frame_t wakeup_infrared_cmd;
+                        build_frame(0x07, 0x00, alive_channel->channel, 0x00, 0x00, &wakeup_infrared_cmd);
+                        handle_response(&wakeup_infrared_cmd);
                 }
             }
             // 是门铃的话要判断处不处于勿扰状态

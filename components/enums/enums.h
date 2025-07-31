@@ -17,13 +17,15 @@ enum class DeviceType {
   DELAYER,
   ACTION_GROUP_OP,
   SNAPSHOT,
-  INDICATOR
+  INDICATOR,
+  NONE = 255
 };
 
 // 这些也是
 enum class InputType {
   PANEL_BTN,
-  DRY_CONTACT
+  DRY_CONTACT,
+  NONE = 255
 };
 
 enum class InputTag {
@@ -40,4 +42,5 @@ enum class TriggerType {
   HIGH_LEVEL,
   INFRARED,
   INFRARED_TIMEOUT,
+  NONE = 255
 };

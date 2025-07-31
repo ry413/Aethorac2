@@ -89,6 +89,9 @@ void LordManager::registerPanelKeyInput(uint16_t iid, const std::string& name, I
 
 void LordManager::registerDryContactInput(uint16_t iid, InputType type, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
     auto input = std::make_unique<ChannelInput>(iid, type, name, tag, channel, trigger_type, duration, std::move(action_groups));
+    if (trigger_type == TriggerType::INFRARED) {
+        input->init_infrared_timer();
+    }
     channel_inputs_map[input->getIid()] = std::move(input);
 }
 
@@ -120,6 +123,16 @@ std::vector<ChannelInput*> LordManager::getAllChannelInputByChannelNum(uint8_t c
         }
     }
     return result;
+}
+
+ChannelInput* LordManager::getAliveChannel() {    
+    for (auto& [iid, input] : channel_inputs_map) {
+        if (input->getTag() == InputTag::IS_ALIVE_CHANNEL) {
+            return input.get();
+        }
+    }
+    ESP_LOGE(TAG, "不存在拥有插拔卡标记的通道");
+    return nullptr;
 }
 
 Panel* LordManager::getPanelByPid(uint8_t pid) {

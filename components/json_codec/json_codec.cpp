@@ -38,6 +38,21 @@ std::vector<std::string_view> splitByLineView(std::string_view content) {
     return lines;
 }
 
+inline const char* json_get_str_safe(yyjson_val* obj, const char* key, const char* def = "") {
+    yyjson_val *v = yyjson_obj_get(obj, key);
+    return (v && yyjson_is_str(v)) ? yyjson_get_str(v) : def;
+}
+
+inline int json_get_int_safe(yyjson_val* obj, const char* key, int def = 0) {
+    yyjson_val *v = yyjson_obj_get(obj, key);
+    return (v && yyjson_is_int(v)) ? yyjson_get_int(v) : def;
+}
+
+inline bool json_get_bool_safe(yyjson_val* obj, const char* key, bool def = false) {
+    yyjson_val *v = yyjson_obj_get(obj, key);
+    return (v && yyjson_is_bool(v)) ? yyjson_get_bool(v) : def;
+}
+
 void parseLocalLogicConfig(void) {
     int file_fd = open(LOGIC_CONFIG_FILE_PATH, O_RDONLY);
     if (file_fd < 0) {
@@ -88,121 +103,140 @@ void parseLocalLogicConfig(void) {
         ESP_LOGE(TAG, "本地配置文件错误");
         return;
     }
-    // printCurrentFreeMemory("分割完");
-
-    yyjson_doc *doc = yyjson_read(lines[1].data(), lines[1].size(), YYJSON_READ_NOFLAG);
-    yyjson_val *root = yyjson_doc_get_root(doc);
-    // printCurrentFreeMemory("yyjson后");
-
-    if (yyjson_val *name = yyjson_obj_get(root, "tm")) {
-
+    
+    ESP_LOGI(TAG, "================ 解析全局配置 ================");
+    yyjson_doc* common_config_doc = yyjson_read(lines[2].data(), lines[2].size(), YYJSON_READ_NOFLAG);
+    yyjson_val* common_config_root = yyjson_doc_get_root(common_config_doc);
+    printCurrentFreeMemory();
+    if (yyjson_val* common_config_obj = yyjson_obj_get(common_config_root, "c"); yyjson_is_obj(common_config_obj)) {
+        if (yyjson_val* air_config_obj = yyjson_obj_get(common_config_obj, "airConfig")) {
+            auto& air_config = AirConGlobalConfig::getInstance();
+            air_config.default_target_temp = json_get_int_safe(air_config_obj, "defaultTargetTemp", 26);
+            air_config.default_mode = static_cast<ACMode>(json_get_int_safe(air_config_obj, "defaultMode", 0));
+            air_config.default_fan_speed = static_cast<ACFanSpeed>(json_get_int_safe(air_config_obj, "defaultFanSpeed", 0));
+            air_config.stop_threshold = json_get_int_safe(air_config_obj, "stopThreshold", 1);
+            air_config.rework_threshold = json_get_int_safe(air_config_obj, "reworkThreshold", 1);
+            air_config.stop_action = static_cast<ACStopAction>(json_get_int_safe(air_config_obj, "stopAction", 0));
+            air_config.remove_card_air_usable = json_get_bool_safe(air_config_obj, "removeCardAirUsable", false);
+            if (yyjson_val* auto_fan_obj = yyjson_obj_get(air_config_obj, "autoFan"); yyjson_is_obj(auto_fan_obj)) {
+                air_config.low_diff = json_get_int_safe(auto_fan_obj, "lowFanTempDiff", 2);
+                air_config.high_diff = json_get_int_safe(auto_fan_obj, "highFanTempDiff", 2);
+                air_config.auto_fun_wind_speed = static_cast<ACFanSpeed>(json_get_int_safe(auto_fan_obj, "autoVentFanSpeed", 1));
+            } else {
+                ESP_LOGW(TAG, "配置[autoFan]错误");
+            }
+            air_config.shutdown_after_duration = json_get_int_safe(air_config_obj, "shutdownAfterDuration", 0);
+            air_config.shutdown_after_fan_speed = static_cast<ACFanSpeed>(json_get_int_safe(air_config_obj, "shutdownAfterFanSpeed", 0));
+        } else {
+            ESP_LOGW(TAG, "配置[airConfig]错误");
+        }
+    } else {
+        ESP_LOGW(TAG, "配置[c]错误");
     }
+    yyjson_doc_free(common_config_doc);
 
-    try {
-        json obj = json::parse(lines[1]);
-        printCurrentFreeMemory("parse后");
+    ESP_LOGI(TAG, "================ 解析设备 ================");
+    printCurrentFreeMemory();
+    yyjson_doc* devices_config_doc = yyjson_read(lines[3].data(), lines[3].size(), YYJSON_READ_NOFLAG);
+    yyjson_val* devices_config_root = yyjson_doc_get_root(devices_config_doc);
+    if (yyjson_val* devices_arr = yyjson_obj_get(devices_config_root, "d"); yyjson_is_arr(devices_arr)) {
+        size_t idx, max;
+        yyjson_val* dev_obj;
 
-        ESP_LOGI(TAG, "================ 解析全局配置 ================");
-        auto& common_config_obj = obj["c"];
-        auto& air_config_obj = common_config_obj["airConfig"];
-        auto& air_config = AirConGlobalConfig::getInstance();
-        air_config.default_target_temp = air_config_obj["defaultTargetTemp"];
-        air_config.default_mode = static_cast<ACMode>(air_config_obj["defaultMode"]);
-        air_config.default_fan_speed = static_cast<ACFanSpeed>(air_config_obj["defaultFanSpeed"]);
-        air_config.stop_threshold = air_config_obj["stopThreshold"];
-        air_config.rework_threshold = air_config_obj["reworkThreshold"];
-        air_config.stop_action = static_cast<ACStopAction>(air_config_obj["stopAction"]);
-        air_config.remove_card_air_usable = air_config_obj["removeCardAirUsable"];
-        air_config.low_diff = air_config_obj["autoFan"]["lowFanTempDiff"];
-        air_config.high_diff = air_config_obj["autoFan"]["highFanTempDiff"];
-        air_config.shutdown_after_duration = air_config_obj["shutdownAfterDuration"];
-        air_config.shutdown_after_fan_speed = static_cast<ACFanSpeed>(air_config_obj["shutdownAfterFanSpeed"]);
+        yyjson_arr_foreach(devices_arr, idx, max, dev_obj) {
+            if (!dev_obj || !yyjson_is_obj(dev_obj)) continue;
 
-        // 注册设备
-        ESP_LOGI(TAG, "================ 解析设备 ================");
-        printCurrentFreeMemory();
-        for (auto& dev: obj["d"]) {
-            uint16_t did = dev["did"];
-            DeviceType type = static_cast<DeviceType>(dev["type"]);
-            std::string name = dev["n"];
-            std::string carry_state = dev.value("ct", "");
+            DeviceType dtype = static_cast<DeviceType>(json_get_int_safe(dev_obj, "type", (int)DeviceType::NONE));
+            uint16_t did = json_get_int_safe(dev_obj, "did", -1);
+            if (dtype == DeviceType::NONE) {
+                ESP_LOGW(TAG, "错误的设备类型, did(%u)", did);
+            }
+
+            const char* name = json_get_str_safe(dev_obj, "n", "");
+            const char* carry_state = json_get_str_safe(dev_obj, "ct", "");
 
             std::vector<uint16_t> link_dids;
-            if (dev.contains("lkds") && dev["lkds"].is_array()) {
-                for (auto& link_did : dev["lkds"]) {
-                    uint16_t did = static_cast<uint16_t>(link_did.get<unsigned int>());
-                    link_dids.push_back(did);
+            if (yyjson_val* lkds_arr = yyjson_obj_get(dev_obj, "lkds"); yyjson_is_arr(lkds_arr)) {
+                size_t idx1, max1;
+                yyjson_val* item1;
+                yyjson_arr_foreach(lkds_arr, idx1, max1, item1) {
+                    if (item1 && yyjson_is_int(item1)) {
+                        link_dids.push_back(yyjson_get_int(item1));
+                    }
                 }
             }
 
             std::vector<uint16_t> repel_dids;
-            if (dev.contains("rpds") && dev["rpds"].is_array()) {
-                for (auto& repel_did : dev["rpds"]) {
-                    uint16_t did = static_cast<uint16_t>(repel_did.get<unsigned int>());
-                    repel_dids.push_back(did);
+            if (yyjson_val* rpds_arr = yyjson_obj_get(dev_obj, "rpds"); yyjson_is_arr(rpds_arr)) {
+                size_t idx1, max1;
+                yyjson_val* item1;
+                yyjson_arr_foreach(rpds_arr, idx1, max1, item1) {
+                    if (item1 && yyjson_is_int(item1)) {
+                        repel_dids.push_back(yyjson_get_int(item1));
+                    }
                 }
             }
 
-            switch (type) {
+            switch (dtype) {
                 case DeviceType::LAMP: {
-                    uint8_t ch = dev["ch"];
+                    uint8_t ch = json_get_int_safe(dev_obj, "ch", 127);
                     ESP_LOGI(TAG, "注册Lamp, did(%u), nm(%s), ch(%u), st(%s)",
-                                            did, name.c_str(), ch, carry_state.c_str());
+                                            did, name, ch, carry_state);
                     lord.registerLamp(did, name, carry_state, ch, link_dids, repel_dids);
                     break;
                 }
                 case DeviceType::CURTAIN: {
-                    uint8_t oc = dev["oc"];
-                    uint8_t cc = dev["cc"];
-                    uint64_t rt = dev["rt"];
+                    uint8_t oc = json_get_int_safe(dev_obj, "oc", 127);
+                    uint8_t cc = json_get_int_safe(dev_obj, "cc", 127);
+                    uint64_t rt = json_get_int_safe(dev_obj, "rt", 10);
                     ESP_LOGI(TAG, "注册Curtain, did(%u), nm(%s), oc(%u), cc(%u), rt(%llu), st(%s)",
-                                                did, name.c_str(), oc, cc, rt, carry_state.c_str());
+                                                did, name, oc, cc, rt, carry_state);
                     lord.registerCurtain(did, name, carry_state,oc, cc, rt);
                     break;
                 }
                 case DeviceType::INFRARED_AIR: {
-                    uint8_t airId = dev["aid"];
+                    uint8_t airId = json_get_int_safe(dev_obj, "aid", 0);
                     ESP_LOGI(TAG, "注册InfraredAir, did(%u), nm(%s), id(%u), st(%s)",
-                                                    did, name.c_str(), airId, carry_state.c_str());
+                                                    did, name, airId, carry_state);
                     lord.registerIngraredAir(did, name, carry_state, airId);
                     break;
                 }
                 case DeviceType::SINGLE_AIR: {
-                    uint8_t airId = dev["aid"];
-                    uint8_t wc = dev["wc"];
-                    uint8_t lc = dev["lc"];
-                    uint8_t mc = dev["mc"];
-                    uint8_t hc = dev["hc"];
+                    uint8_t airId = json_get_int_safe(dev_obj, "aid", 0);
+                    uint8_t wc = json_get_int_safe(dev_obj, "wc", 127);
+                    uint8_t lc = json_get_int_safe(dev_obj, "lc", 127);
+                    uint8_t mc = json_get_int_safe(dev_obj, "mc", 127);
+                    uint8_t hc = json_get_int_safe(dev_obj, "hc", 127);
                     ESP_LOGI(TAG, "注册SingleAir, did(%u), nm(%s), id(%u), wc(%u), lc(%u), mc(%u), hc(%u), st(%s)",
-                                                 did, name.c_str(), airId, wc, lc, mc, hc, carry_state.c_str());
+                                                    did, name, airId, wc, lc, mc, hc, carry_state);
                     lord.registerSingleAir(did, name, carry_state, airId, wc, lc, mc, hc);
                     break;
                 }
                 case DeviceType::RS485: {
-                    std::string code = dev["cd"];
+                    const char* code = json_get_str_safe(dev_obj, "cd", "");
                     ESP_LOGI(TAG, "注册RS485, did(%u), nm(%s), code(%s), st(%s)",
-                                             did, name.c_str(), code.c_str(), carry_state.c_str());
+                                                did, name, code, carry_state);
                     lord.registerRs485(did, name, carry_state, code);
                     break;
                 }
                 case DeviceType::RELAY: {
-                    uint8_t ch = dev["ch"];
+                    uint8_t ch = json_get_int_safe(dev_obj, "ch", 127);
                     ESP_LOGI(TAG, "注册RelayOut, did(%u), nm(%s), ch(%u), st(%s)",
-                                            did, name.c_str(), ch, carry_state.c_str());
+                                            did, name, ch, carry_state);
                     lord.registerRelayOut(did, name, carry_state, ch);
                     break;
                 }
                 case DeviceType::DRY_CONTACT: {
-                    uint8_t ch = dev["ch"];
+                    uint8_t ch = json_get_int_safe(dev_obj, "ch", 127);
                     ESP_LOGI(TAG, "注册DryContactOut, did(%u), nm(%s), ch(%u), st(%s)",
-                                            did, name.c_str(), ch, carry_state.c_str());
+                                            did, name, ch, carry_state);
                     lord.registerDryContactOut(did, name, carry_state, ch, link_dids, repel_dids);
                     break;
                 }
                 case DeviceType::DOORBELL: {
-                    uint8_t ch = dev["ch"];
+                    uint8_t ch = json_get_int_safe(dev_obj, "ch", 127);
                     ESP_LOGI(TAG, "注册门铃, did(%u), nm(%s), ch(%u), st(%s)",
-                                            did, name.c_str(), ch, carry_state.c_str());
+                                            did, name, ch, carry_state);
                     lord.registerRelayOut(did, name, carry_state, ch);
                     break;
                 }
@@ -213,73 +247,109 @@ void parseLocalLogicConfig(void) {
                 case DeviceType::SNAPSHOT:
                 case DeviceType::INDICATOR: {
                     ESP_LOGI(TAG, "注册预设设备, did(%u), nm(%s)",
-                                               did, name.c_str());
-                    lord.registerPreset(did, name, carry_state, type);
+                                                did, name);
+                    lord.registerPreset(did, name, carry_state, dtype);
                     break;
                 }
                 default:
-                    ESP_LOGE(TAG, "未处理的设备类型: %i", (int)type);
+                    ESP_LOGE(TAG, "未处理的设备类型: %i", (int)dtype);
                     break;
             }
         }
-        // 解析动作组
-        ESP_LOGI(TAG, "================ 解析自定义模式 ================");
-        printCurrentFreeMemory();
-        for (auto& actionGroup : obj["a"]) {
-            std::string name = actionGroup["n"];
-            uint16_t aid = actionGroup["aid"];
-            bool is_mode = actionGroup.value("m", false);
+    } else {
+        ESP_LOGW(TAG, "配置[d]错误");
+    }
+    yyjson_doc_free(devices_config_doc);
+
+    ESP_LOGI(TAG, "================ 解析自定义模式 ================");
+    printCurrentFreeMemory();
+    yyjson_doc* action_groups_config_doc = yyjson_read(lines[4].data(), lines[4].size(), YYJSON_READ_NOFLAG);
+    yyjson_val* action_groups_config_root = yyjson_doc_get_root(action_groups_config_doc);
+    if (yyjson_val* action_groups_arr = yyjson_obj_get(action_groups_config_root, "a"); yyjson_is_arr(action_groups_arr)) {
+        size_t idx, max;
+        yyjson_val* ag_obj;
+
+        yyjson_arr_foreach(action_groups_arr, idx, max, ag_obj) {
+            if (!ag_obj || !yyjson_is_obj(ag_obj)) continue;
+            const char* name = json_get_str_safe(ag_obj, "n", "");
+            uint16_t aid = json_get_int_safe(ag_obj, "aid", -1);
+            bool is_mode = json_get_bool_safe(ag_obj, "m", false);
 
             std::vector<AtomicAction> actions;
-            for (auto& action : actionGroup["a"]) {
-                uint16_t target_did = action["t"];
-                IDevice* dev = lord.getDeviceByDid(target_did);
-                if (dev != nullptr) {
-                    actions.push_back(AtomicAction{
-                        .target_device = dev,
-                        .operation = action["o"],
-                        .parameter = action.value("p", "")
-                    });
-                }
-            }
-            ESP_LOGI(TAG, "注册模式, aid(%u), nm(%s), is_mode(%u), size(%u)",
-                                     aid, name.c_str(), is_mode, actions.size());
-            lord.registerActionGroup(aid, name, is_mode, actions);
-        }
-        // 解析输入
-        ESP_LOGI(TAG, "================ 解析输入 ================");
-        printCurrentFreeMemory();
-        for (auto& input: obj["i"]) {
-            std::string name = input["n"];
-            uint16_t iid = input["iid"];
-            InputType type = static_cast<InputType>(input["type"]);
-            InputTag tag = static_cast<InputTag>(input.value("tg", InputTag::NONE));
-
-            std::vector<std::unique_ptr<ActionGroup>> action_groups;
-            for (auto& action_group : input["a"]) {
-                std::vector<AtomicAction> actions;
-                for (auto& action : action_group) {
-                    uint8_t target_did = action["t"];
-                    IDevice* dev = lord.getDeviceByDid(target_did);
-                    if (dev != nullptr) {
+            if (yyjson_val* action_arr = yyjson_obj_get(ag_obj, "a"); yyjson_is_arr(action_arr)) {
+                size_t idx1, max1;
+                yyjson_val* item1;
+                yyjson_arr_foreach(action_arr, idx1, max1, item1) {
+                    if (!item1 || !yyjson_is_obj(item1)) continue;
+                    uint16_t target_did = json_get_int_safe(item1, "t", -1);
+                    if (IDevice* dev = lord.getDeviceByDid(target_did)) {
                         actions.push_back(AtomicAction{
                             .target_device = dev,
-                            .operation = action["o"],
-                            .parameter = action.value("p", "")
+                            .operation = json_get_str_safe(item1, "o", ""),
+                            .parameter = json_get_str_safe(item1, "p", "")
                         });
                     } else {
                         ESP_LOGW(TAG, "设备(%u)不存在", target_did);
                     }
                 }
-                // 基本上是幽灵动作组, 是Input私有的
-                action_groups.push_back(std::make_unique<ActionGroup>(static_cast<uint16_t>(-1), "", false, actions));
+            } else {
+                ESP_LOGE(TAG, "配置[a][a]错误");
+            }
+            ESP_LOGI(TAG, "注册模式, aid(%u), nm(%s), is_mode(%u), size(%u)",
+                                     aid, name, is_mode, actions.size());
+            lord.registerActionGroup(aid, name, is_mode, actions);
+        }
+    } else {
+        ESP_LOGW(TAG, "配置[a]错误");
+    }
+    yyjson_doc_free(action_groups_config_doc);
+
+    ESP_LOGI(TAG, "================ 解析输入 ================");
+    printCurrentFreeMemory();
+    yyjson_doc* inputs_config_doc = yyjson_read(lines[5].data(), lines[5].size(), YYJSON_READ_NOFLAG);
+    yyjson_val* inputs_config_root = yyjson_doc_get_root(inputs_config_doc);
+    if (yyjson_val* inputs_arr = yyjson_obj_get(inputs_config_root, "i"); yyjson_is_arr(inputs_arr)) {
+        size_t idx, max;
+        yyjson_val* input_obj;
+        yyjson_arr_foreach(inputs_arr, idx, max, input_obj) {
+            if (!input_obj || !yyjson_is_obj(input_obj)) continue;
+            const char* name = json_get_str_safe(input_obj, "n", "");
+            uint16_t iid = json_get_int_safe(input_obj, "iid", -1);
+            InputType itype = static_cast<InputType>(json_get_int_safe(input_obj, "type", (int)InputType::NONE));
+            InputTag tag = static_cast<InputTag>(json_get_int_safe(input_obj, "tg", (int)InputTag::NONE));
+            std::vector<std::unique_ptr<ActionGroup>> action_groups;
+            if (yyjson_val* ag_arr = yyjson_obj_get(input_obj, "a"); yyjson_is_arr(ag_arr)) {
+                size_t idx1, max1;
+                yyjson_val* actions_arr;
+                yyjson_arr_foreach(ag_arr, idx1, max1, actions_arr) {
+                    if (!actions_arr || !yyjson_is_arr(actions_arr)) continue;
+                    size_t idx2, max2;
+                    yyjson_val* action_obj;
+                    std::vector<AtomicAction> actions;
+                    yyjson_arr_foreach(actions_arr, idx2, max2, action_obj) {
+                        if (!action_obj || !yyjson_is_obj(action_obj)) continue;
+                        uint16_t target_did = json_get_int_safe(action_obj, "t", -1);
+                        if (IDevice* dev = lord.getDeviceByDid(target_did)) {
+                            actions.push_back(AtomicAction{
+                                .target_device = dev,
+                                .operation = json_get_str_safe(action_obj, "o", ""),
+                                .parameter = json_get_str_safe(action_obj, "p", "")
+                            });
+                        } else {
+                            ESP_LOGW(TAG, "设备(%u)不存在", target_did);
+                        }
+                    }
+                    action_groups.push_back(std::make_unique<ActionGroup>(static_cast<uint16_t>(-1), "", false, actions));
+                }
+            } else {
+                ESP_LOGE(TAG, "配置[i][a]错误, iid: %u", iid);
             }
 
-            if (type == InputType::PANEL_BTN) {
-                uint8_t pid = input["pid"];
-                uint8_t bid = input["bid"];
+            if (itype == InputType::PANEL_BTN) {
+                uint8_t pid = json_get_int_safe(input_obj, "pid", -1);;
+                uint8_t bid = json_get_int_safe(input_obj, "bid", -1);;
                 // 如果有lightBindDevice, 就把此面板按键绑定给对应设备
-                if (int lbd = input.value("lbd", -1); lbd > -1) {
+                if (int lbd = json_get_int_safe(input_obj, "lbd", -1); lbd > -1) {
                     if (IDevice* dev = lord.getDeviceByDid(lbd)) {
                         DeviceType dev_type = dev->getType();
                         if (dev_type == DeviceType::LAMP) {
@@ -313,33 +383,31 @@ void parseLocalLogicConfig(void) {
                         ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
                     }
                 }
-
                 ESP_LOGI(TAG, "注册按键, iid(%u), nm(%s), pid(%u), bid(%u), tag(%d), g_size(%u)",
-                                        iid, name.c_str(), pid, bid, (int)tag, action_groups.size());
+                                        iid, name, pid, bid, (int)tag, action_groups.size());
                 lord.registerPanelKeyInput(iid, name, tag, pid, bid, std::move(action_groups));
-
-            } else if (type == InputType::DRY_CONTACT) {
-                uint8_t channel = input["ch"];
-                TriggerType tt = static_cast<TriggerType>(input["tt"]);
-                uint64_t duration = 0;
+            } else if (itype == InputType::DRY_CONTACT) {
+                uint8_t channel = json_get_int_safe(input_obj, "ch");
+                TriggerType tt = static_cast<TriggerType>(json_get_int_safe(input_obj, "tt", (int)TriggerType::NONE));
+                uint64_t duration = 1;
                 if (tt == TriggerType::INFRARED) {
-                    duration = input["du"];
+                    duration = json_get_int_safe(input_obj, "du", 1);
                 }
 
                 ESP_LOGI(TAG, "注册干接点输入, iid(%d), tp(%d), nm(%s), ch(%d), tt(%d), tag(%d), g_size(%d), du(%lld)",
-                        iid, (int)type, name.c_str(), channel, (int)tt, (int)tag, action_groups.size(), duration);
-                lord.registerDryContactInput(iid, type, name, tag, channel, tt, duration, std::move(action_groups));
+                        iid, (int)itype, name, channel, (int)tt, (int)tag, action_groups.size(), duration);
+                lord.registerDryContactInput(iid, itype, name, tag, channel, tt, duration, std::move(action_groups));
             }
         }
-
-        ESP_LOGI(TAG, "================ 配置解析完成 ================");
-        IndicatorHolder::getInstance().callAllAndClear();               // 同步指示灯
-        generate_response(AIR_CON, AIR_CON_INQUIRE, 0x00, 0x00, 0x00);  // 逼迫温控器上报状态
-
-        printCurrentFreeMemory();
-    } catch(const std::exception& e) {
-        ESP_LOGE(TAG, "%s: %s, 内容: %s", __func__, e.what(), config_json.c_str());
+    } else {
+        ESP_LOGW(TAG, "配置[i]错误");
     }
+    yyjson_doc_free(inputs_config_doc);
+    ESP_LOGI(TAG, "================ 配置解析完成 ================");
+    IndicatorHolder::getInstance().callAllAndClear();               // 同步指示灯
+    generate_response(AIR_CON, AIR_CON_INQUIRE, 0x00, 0x00, 0x00);  // 逼迫温控器上报状态
+
+    printCurrentFreeMemory();
 }
 
 json generateRegisterInfo() {
@@ -385,11 +453,15 @@ json generateRegisterInfo() {
         
         j["others"] = json::array();
         for (SingleRelayDevice* relay : lord.getDevicesByType<SingleRelayDevice>()) {
-            json relay_obj;
-            relay_obj["id"] = relay->getDid();
-            relay_obj["name"] = relay->getName();
-            relay_obj["state"] = relay->isOn() ? "1" : "0";
-            j["others"].push_back(relay_obj);
+            if (dynamic_cast<Lamp*>(relay)) {
+
+            } else {
+                json relay_obj;
+                relay_obj["id"] = relay->getDid();
+                relay_obj["name"] = relay->getName();
+                relay_obj["state"] = relay->isOn() ? "1" : "0";
+                j["others"].push_back(relay_obj);
+            }
         }
         for (DryContactOut* dry : lord.getDevicesByType<DryContactOut>()) {
             json dry_obj;
@@ -448,10 +520,14 @@ json generateReportStates() {
 
         j["others"] = json::array();
         for (SingleRelayDevice* relay : lord.getDevicesByType<SingleRelayDevice>()) {
-            json relay_obj;
-            relay_obj["id"] = relay->getDid();
-            relay_obj["state"] = relay->isOn() ? 1 : 0;
-            j["others"].push_back(relay_obj);
+            if (dynamic_cast<Lamp*>(relay)) {
+
+            } else {
+                json relay_obj;
+                relay_obj["id"] = relay->getDid();
+                relay_obj["state"] = relay->isOn() ? 1 : 0;
+                j["others"].push_back(relay_obj);
+            }
         }
         for (DryContactOut* dry : lord.getDevicesByType<DryContactOut>()) {
             json dry_obj;
