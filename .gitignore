@@ -8,3 +8,7 @@
 
 # 私密编译期头文件
 /components/my_mqtt/mqtt_secrets.h
+
+# temp文件
+/a.json
+/mt.py

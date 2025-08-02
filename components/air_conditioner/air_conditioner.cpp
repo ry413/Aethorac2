@@ -73,7 +73,7 @@ void AirConBase::update_state(uint8_t state, uint8_t temps) {
 // 另一种操控空调的方式, 比如语音控制, 后台控制
 void SinglePipeFCU::execute(std::string operation, std::string parameter, ActionGroup* self_action_group, bool should_log) {
     add_log_entry("air", did, operation, parameter, should_log);
-    ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
+    ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s] param[%s]", name.c_str(), operation.c_str(), parameter.c_str());
 
     // 直接处理关闭
     if (operation == "关闭") {
@@ -408,7 +408,7 @@ void InfraredAC::execute(std::string operation, std::string parameter, ActionGro
         }
     } else if (operation == "温度升高") {
         uint8_t current_temp = target_temp.load();
-        if (current_temp < 30) {
+        if (current_temp < 31) {
             target_temp.store(current_temp + 1);
         }
     } else if (operation == "温度降低") {

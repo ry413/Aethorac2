@@ -1,0 +1,9 @@
+## [1.0.0] - 2025-08-02
+### Added
+- 为 `SingleRelayDevice` 与 `DryContactOut` 添加了关联设备与排斥设备的解析与处理
+
+### Fixed
+- 修复 `InfraredAC::execute` 的 `"温度升高"` 操作无法将温度升至31的问题
+- 修复 `LordManager::registerDryContactInput` 时应该查询插拔卡通道物理状态的问题
+- 修复日志重定向至mqtt时, "OTA_OK"消息无法在网上收到的问题
+- 修复 `handle_mqtt_ndjson` 里将 `param` 写错成 `parameter` 的问题

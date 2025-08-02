@@ -186,8 +186,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
             esp_log_set_vprintf(my_log_send_func);
         }
         ESP_LOGI(TAG, "日志已重定向至mqtt");
-        vTaskDelay(pdMS_TO_TICKS(100));
-        report_after_ota();
+        xTaskCreate([](void *param) {            
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            report_after_ota();
+            vTaskDelete(nullptr);
+        }, "report_after_ota_task", 4096, nullptr, 3, nullptr);
         break;
     }
     case MQTT_EVENT_DISCONNECTED: {
@@ -279,7 +282,6 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
         ESP_LOGW(TAG, "接收到空行，忽略");
         return;
     }
-    // ESP_LOGI(TAG, "%s", data);
 
     json obj;   
     try {
@@ -299,10 +301,6 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
     const json& value = it.value();
 
     std::string type = value.get<std::string>();
-    printf("key: %.*s, value: %.*s\n",
-        (int)key.size(), key.data(),
-        (int)type.size(), type.data());
-
 
     try {
         const std::string& data_type = obj["type"];
@@ -316,11 +314,11 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                     uint16_t dev_did = static_cast<uint16_t>(std::stoi(msg.value("deviceid", "-1")));
                     std::string operation = msg.value("operation", "");
                     std::string parameter;
-                    if (msg.contains("parameter")) {
-                        if (msg["parameter"].is_string()) {
-                            parameter = msg["parameter"];
-                        } else if (msg["parameter"].is_number()) {
-                            parameter = std::to_string(msg["parameter"].get<int>());
+                    if (msg.contains("param")) {
+                        if (msg["param"].is_string()) {
+                            parameter = msg["param"];
+                        } else if (msg["param"].is_number()) {
+                            parameter = std::to_string(msg["param"].get<int>());
                         }
                     }
 

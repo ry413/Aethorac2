@@ -47,8 +47,9 @@ void LordManager::registerRs485(uint16_t did, const std::string& name, const std
     devices_map[dev->getDid()] = std::move(dev);
 }
 
-void LordManager::registerRelayOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel) {
+void LordManager::registerRelayOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel, const std::vector<uint16_t> link_dids, const std::vector<uint16_t> repel_dids) {
     auto dev = std::make_unique<SingleRelayDevice>(did, DeviceType::RELAY, name, carry_state, channel, readRelayPhysicsState(channel));
+    dev->addLinkDidsAndRepelDids(link_dids, repel_dids);
     devices_map[dev->getDid()] = std::move(dev);
 }
 
@@ -91,6 +92,16 @@ void LordManager::registerDryContactInput(uint16_t iid, InputType type, const st
     auto input = std::make_unique<ChannelInput>(iid, type, name, tag, channel, trigger_type, duration, std::move(action_groups));
     if (trigger_type == TriggerType::INFRARED) {
         input->init_infrared_timer();
+    } else {
+        // 注册时看看插拔卡输入通道的物理状态
+        if (tag == InputTag::IS_ALIVE_CHANNEL) {
+            if (readDrycontactInputPhysicsState(channel)) {
+                setAlive(true);
+                useAliveHeartBeat();
+            } else {
+
+            }
+        }
     }
     channel_inputs_map[input->getIid()] = std::move(input);
 }

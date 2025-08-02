@@ -223,7 +223,7 @@ void parseLocalLogicConfig(void) {
                     uint8_t ch = json_get_int_safe(dev_obj, "ch", 127);
                     ESP_LOGI(TAG, "注册RelayOut, did(%u), nm(%s), ch(%u), st(%s)",
                                             did, name, ch, carry_state);
-                    lord.registerRelayOut(did, name, carry_state, ch);
+                    lord.registerRelayOut(did, name, carry_state, ch, link_dids, repel_dids);
                     break;
                 }
                 case DeviceType::DRY_CONTACT: {
@@ -237,7 +237,7 @@ void parseLocalLogicConfig(void) {
                     uint8_t ch = json_get_int_safe(dev_obj, "ch", 127);
                     ESP_LOGI(TAG, "注册门铃, did(%u), nm(%s), ch(%u), st(%s)",
                                             did, name, ch, carry_state);
-                    lord.registerRelayOut(did, name, carry_state, ch);
+                    lord.registerRelayOut(did, name, carry_state, ch, link_dids, repel_dids);
                     break;
                 }
                 case DeviceType::HEARTBEAT:
@@ -355,6 +355,7 @@ void parseLocalLogicConfig(void) {
                         if (dev_type == DeviceType::LAMP) {
                             if (Lamp* lamp = dynamic_cast<Lamp*>(dev)) {
                                 lamp->addAssBtn(PanelButtonPair({pid, bid}));
+                                ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
                             }
                         } else if (dev_type == DeviceType::CURTAIN) {
                             if (Curtain* curtain = dynamic_cast<Curtain*>(dev)) {
@@ -363,8 +364,10 @@ void parseLocalLogicConfig(void) {
                                     for (auto& a : ag->actions) {
                                         if (a.operation == "开") {
                                             curtain->addOpenAssBtn(PanelButtonPair({pid, bid}));
+                                            ESP_LOGI(TAG, "绑定%u,%u至%s(%u) 开", pid, bid, dev->getName().c_str(), dev->getDid());
                                         } else if (a.operation == "关") {
                                             curtain->addCloseAssBtn(PanelButtonPair({pid, bid}));
+                                            ESP_LOGI(TAG, "绑定%u,%u至%s(%u) 关", pid, bid, dev->getName().c_str(), dev->getDid());
                                         }
                                     }
                                 }
@@ -372,15 +375,16 @@ void parseLocalLogicConfig(void) {
                         } else if (dev_type == DeviceType::RELAY) {
                             if (SingleRelayDevice* relay = dynamic_cast<SingleRelayDevice*>(dev)) {
                                 relay->addAssBtn(PanelButtonPair({pid, bid}));
+                                ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
                             }
                         } else if (dev_type == DeviceType::DRY_CONTACT) {
                             if (DryContactOut* dry = dynamic_cast<DryContactOut*>(dev)) {
                                 dry->addAssBtn(PanelButtonPair({pid, bid}));
+                                ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
                             }
                         } else {
                             ESP_LOGW(TAG, "无效的关联设备: %s(%u)", dev->getName().c_str(), dev->getDid());
                         }
-                        ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
                     }
                 }
                 ESP_LOGI(TAG, "注册按键, iid(%u), nm(%s), pid(%u), bid(%u), tag(%d), g_size(%u)",

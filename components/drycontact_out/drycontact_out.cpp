@@ -25,6 +25,8 @@ void DryContactOut::open_self(bool should_log) {
     current_state = State::ON;
     updateButtonIndicator(true);
     change_state(true);
+    sync_link_devices("开");
+    close_repel_devices();
 }
 
 void DryContactOut::close_self(bool should_log) {
@@ -32,6 +34,7 @@ void DryContactOut::close_self(bool should_log) {
     current_state = State::OFF;
     updateButtonIndicator(false);
     change_state(false);
+    sync_link_devices("关");
 }
 
 void DryContactOut::updateButtonIndicator(bool state) {

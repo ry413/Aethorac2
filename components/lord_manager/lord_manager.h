@@ -34,7 +34,7 @@ public:
     void registerIngraredAir(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t airId);
     void registerSingleAir(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t airId, uint8_t wc, uint8_t lc, uint8_t mc, uint8_t hc);
     void registerRs485(uint16_t did, const std::string& name, const std::string& carry_state, const std::string& code);
-    void registerRelayOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel);
+    void registerRelayOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel, const std::vector<uint16_t> link_dids, const std::vector<uint16_t> repel_dids);
     void registerDryContactOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel, const std::vector<uint16_t> link_dids, const std::vector<uint16_t> repel_dids);
     void registerDoorbell(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel);
     void registerActionGroup(uint16_t aid, const std::string& name, bool is_mode, std::vector<AtomicAction> actions);
