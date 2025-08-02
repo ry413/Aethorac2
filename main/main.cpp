@@ -68,7 +68,7 @@ static void monitor_task(void *pvParameter) {
         //         heap_caps_get_free_size(MALLOC_CAP_INTERNAL), heap_caps_get_free_size(MALLOC_CAP_DMA));
 
         // add_log_entry("monitor", 0, "memory", buffer, true);
-		vTaskDelay(10000 / portTICK_PERIOD_MS);
+		vTaskDelay(pdMS_TO_TICKS(60 * 60 * 1000));
 	}
 }
 

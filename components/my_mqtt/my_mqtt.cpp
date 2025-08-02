@@ -117,11 +117,6 @@ static void report_operation_task(void *param) {
 }
 
 static void report_after_ota(void) {
-    static bool is_first = true;
-    if (!is_first) {
-        return;
-    }
-
     const esp_partition_t *part = esp_ota_get_running_partition();
     const esp_app_desc_t  *app  = esp_app_get_description();
 
@@ -150,7 +145,6 @@ static void report_after_ota(void) {
             esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
     printf("OTA-POST: %s\n", msg);
     ESP_LOGI("OTA-POST", "%s", msg);
-    is_first = false;
 }
 
 static void register_the_rcu();
@@ -187,7 +181,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         }
         ESP_LOGI(TAG, "日志已重定向至mqtt");
         xTaskCreate([](void *param) {            
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            vTaskDelay(pdMS_TO_TICKS(3000));
             report_after_ota();
             vTaskDelete(nullptr);
         }, "report_after_ota_task", 4096, nullptr, 3, nullptr);
