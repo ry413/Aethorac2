@@ -400,7 +400,12 @@ void parseLocalLogicConfig(void) {
 
                 ESP_LOGI(TAG, "注册干接点输入, iid(%d), tp(%d), nm(%s), ch(%d), tt(%d), tag(%d), g_size(%d), du(%lld)",
                         iid, (int)itype, name, channel, (int)tt, (int)tag, action_groups.size(), duration);
-                lord.registerDryContactInput(iid, itype, name, tag, channel, tt, duration, std::move(action_groups));
+                lord.registerDryContactInput(iid, name, tag, channel, tt, duration, std::move(action_groups));
+            } else if (itype == InputType::VOICE_CMD) {
+                const char* code = json_get_str_safe(input_obj, "cd");
+                ESP_LOGI(TAG, "注册语音指令输入, iid(%d), tp(%d), nm(%s), code(%s), tag(%d), g_size(%d)",
+                        iid, (int)itype, name, code, (int)tag, action_groups.size());
+                lord.registerVoiceInput(iid, name, tag, code, std::move(action_groups));
             }
         }
     } else {

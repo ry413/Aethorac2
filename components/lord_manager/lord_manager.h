@@ -11,6 +11,7 @@
 #include "iinput.h"
 #include "channel_input.h"
 #include "panel_input.h"
+#include "voice_command.h"
 #include "esp_timer.h"
 
 static std::array<uint8_t, 8> alive_heartbeat_code = {0x7F, 0xC0, 0xFF, 0xFF, 0x00, 0x80, 0xBD, 0x7E};
@@ -38,8 +39,10 @@ public:
     void registerDryContactOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel, const std::vector<uint16_t> link_dids, const std::vector<uint16_t> repel_dids);
     void registerDoorbell(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel);
     void registerActionGroup(uint16_t aid, const std::string& name, bool is_mode, std::vector<AtomicAction> actions);
+
     void registerPanelKeyInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t pid, uint8_t bid, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
-    void registerDryContactInput(uint16_t iid, InputType type, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
+    void registerDryContactInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
+    void registerVoiceInput(uint16_t iid, const std::string& name, InputTag tag, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
 
     // ================ 获取注册表里的某些东西 ================
     IDevice* getDeviceByDid(uint16_t did);
@@ -67,6 +70,9 @@ public:
     // ================ 按键面板 ================
     void handlePanel(uint8_t panel_id, uint8_t target_buttons, uint8_t old_bl_state);
     void wishIndicatorAllPanel(bool state);   // 希望操作所有面板的指示灯
+    
+    // ================ 语音指令 ================
+    void handleVoiceCmd(uint8_t* code_data);
     
     // ================ 空调 ================
     void updateAirState(uint8_t states, uint8_t temps);
@@ -119,6 +125,7 @@ private:
     std::unordered_map<uint16_t, std::unique_ptr<ActionGroup>> action_groups_map;   // aid, action_group
     std::unordered_map<uint16_t, std::unique_ptr<ChannelInput>> channel_inputs_map; // iid, channel_input
     std::unordered_map<uint8_t, std::unique_ptr<Panel>> panels_map;                 // pid, panel       // 不使用iid, panel是包装类, 里边的PanelButtonInput才是与ChannelInput同辈分的类
+    std::unordered_map<uint8_t, std::unique_ptr<VoiceCommand>> voice_cmds_map;      // iid, voice_cmd
 
     SemaphoreHandle_t relay_physics_map_mutex;
     std::unordered_map<uint8_t, bool> relay_physics_map;                            // channel, state   // 继电器物理通断状态

@@ -25,6 +25,7 @@ enum class DeviceType {
 enum class InputType {
   PANEL_BTN,
   DRY_CONTACT,
+  VOICE_CMD,
   NONE = 255
 };
 

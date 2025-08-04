@@ -10,8 +10,8 @@
 
 class ChannelInput : public InputBase {
 public:
-    ChannelInput(uint16_t iid, InputType type, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
-        : InputBase(iid, type, name, tag, std::move(action_groups)), channel(channel), trigger_type(trigger_type), duration(duration) {}
+    ChannelInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
+        : InputBase(iid, InputType::DRY_CONTACT, name, tag, std::move(action_groups)), channel(channel), trigger_type(trigger_type), duration(duration) {}
 
     ~ChannelInput() {
         if (uncertain_timer != nullptr) {

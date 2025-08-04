@@ -5,32 +5,27 @@
 #include "action_group.h"
 #include "rs485_comm.h"
 #include "lamp.h"
-// #include "other_device.h"
+#include "lord_manager.h"
+#include <drycontact_out.h>
 
-// void VoiceCommand::execute() {
-//     if (is_sleep()) {
-//         wakeup_heartbeat();
+#define TAG "VOICE_CMD"
 
-//         auto lamps = DeviceManager::getInstance().getDevicesOfType<Lamp>();
-//         for (auto& lamp : lamps) {
-//             if (lamp->isOn()) {
-//                 lamp->updateButtonIndicator(true);
-//             }
-//         }
+void VoiceCommand::execute() {
+    ESP_LOGI_CYAN(TAG, "语音指令[%s]开始执行动作组(%u/%u)", name.c_str(), current_index + 1, action_groups.size());
+    static auto& lord = LordManager::instance();
 
-//         auto others = DeviceManager::getInstance().getDevicesOfType<PresetDevice>();
-//         for (auto& other : others) {
-//             if (other->type == OtherDeviceType::OUTPUT_CONTROL) {
-//                 if (other->isOn()) {
-//                     other->updateButtonIndicator(true);
-//                 }
-//             }
-//         }
-//     }
+    if (lord.isSleep()) {
+        lord.useAliveHeartBeat();
+        for (auto* dry : lord.getDevicesByType<DryContactOut>()) {
+            dry->syncAssBtnToDevState();
+        }
+    }
 
-//     if (current_index < action_groups.size()) {
-//         action_groups[current_index]->executeAllAtomicAction(mode_name);
+    // 语音输入应该不需要任意键执行
 
-//         current_index = (current_index + 1) % action_groups.size();
-//     }
-// }
+    if (current_index < action_groups.size()) {
+        action_groups[current_index]->executeAllAtomicAction();
+
+        current_index = (current_index + 1) % action_groups.size();
+    }
+}

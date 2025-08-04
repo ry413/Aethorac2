@@ -1,6 +1,7 @@
 /build/
 /esp_idf_components/
 .DS_Store
+/.vscode/
 
 # Prerequisites
 *.cproject
@@ -10,4 +11,4 @@
 /components/my_mqtt/mqtt_secrets.h
 
 # temp文件
-/a.json
+*.json

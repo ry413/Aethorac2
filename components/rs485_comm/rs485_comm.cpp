@@ -180,28 +180,28 @@ void handle_rs485_data(uint8_t* data, int length) {
     }
         
     // ******************** 判断功能码 ********************
-
+    static auto& lord = LordManager::instance();
     // 开关上报
     if (data[1] == SWITCH_REPORT) {
-        LordManager::instance().handlePanel(data[3], data[4], data[5]);
+        lord.handlePanel(data[3], data[4], data[5]);
     }
-    // // 语音控制
-    // else if (data[1] == VOICE_CONTROL) {
-    //     VoiceCommandManager::getInstance().handle_voice_command(data);
-    // }
+    // 语音控制
+    else if (data[1] == VOICE_CONTROL) {
+        lord.handleVoiceCmd(data);
+    }
     // 空调响应
     else if (data[1] == AIR_CON) {
         uint8_t cmd_type = data[2];
         // 空调状态上报
         if (cmd_type == AIR_CON_REPORT) {
-            LordManager::instance().updateAirState(data[4], data[5]);
+            lord.updateAirState(data[4], data[5]);
         }
     }
     // 红外温感发来的指令
     else if (data[1] == INFRARED_CONTEROLLER) {
         // 上报室温
         if (data[2] == 0x00) {
-            LordManager::instance().updateRoomTemp(data[3], data[4]);
+            lord.updateRoomTemp(data[3], data[4]);
         }
         // 响应查询, 返回空调红外码库编码
         else if (data[2] == 0x11) {

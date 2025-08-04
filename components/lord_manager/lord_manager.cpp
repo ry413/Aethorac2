@@ -88,8 +88,8 @@ void LordManager::registerPanelKeyInput(uint16_t iid, const std::string& name, I
     }
 }
 
-void LordManager::registerDryContactInput(uint16_t iid, InputType type, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
-    auto input = std::make_unique<ChannelInput>(iid, type, name, tag, channel, trigger_type, duration, std::move(action_groups));
+void LordManager::registerDryContactInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
+    auto input = std::make_unique<ChannelInput>(iid, name, tag, channel, trigger_type, duration, std::move(action_groups));
     if (trigger_type == TriggerType::INFRARED) {
         input->init_infrared_timer();
     } else {
@@ -104,6 +104,11 @@ void LordManager::registerDryContactInput(uint16_t iid, InputType type, const st
         }
     }
     channel_inputs_map[input->getIid()] = std::move(input);
+}
+
+void LordManager::registerVoiceInput(uint16_t iid, const std::string& name, InputTag tag, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
+    auto input = std::make_unique<VoiceCommand>(iid, name, tag, code, std::move(action_groups));
+    voice_cmds_map[input->getIid()] = std::move(input);
 }
 
 IDevice* LordManager::getDeviceByDid(uint16_t did) {
@@ -163,6 +168,14 @@ void LordManager::wishIndicatorAllPanel(bool state) {
     for (const auto& [pid, panel_ptr] : panels_map) {
         if (panel_ptr) {
             panel_ptr->wishIndicatorByPanel(state);
+        }
+    }
+}
+
+void LordManager::handleVoiceCmd(uint8_t* code_data) {
+    for (const auto& [iid, voice_ptr] : voice_cmds_map) {
+        if (voice_ptr && memcmp(voice_ptr->getCode().data(), code_data, 8) == 0) {
+            voice_ptr->execute();
         }
     }
 }

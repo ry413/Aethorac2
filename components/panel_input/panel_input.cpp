@@ -12,7 +12,7 @@ void PanelButtonInput::execute() {
     ESP_LOGI(TAG, "pid(%d) bid(%d)开始执行动作组(%d)", pid, bid, current_index);
     static auto& lord = LordManager::instance();
 
-    // 这个得放在拔卡检测前面, 因为红外
+    // 任意键执行得放在getAlive检测前面, 因为红外超时导致错误拔卡, 需要可以用面板返回插卡状态
     if (lord.execute_any_key_action_group()) {
         printf("已调用任意键执行动作组, 返回\n");
 
