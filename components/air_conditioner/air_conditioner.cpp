@@ -76,7 +76,7 @@ void SinglePipeFCU::execute(std::string operation, std::string parameter, Action
     ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s] param[%s]", name.c_str(), operation.c_str(), parameter.c_str());
 
     // 直接处理关闭
-    if (operation == "关闭") {
+    if (operation == "关") {
         power_off();
         sync_states();
         return;
@@ -372,7 +372,7 @@ void InfraredAC::execute(std::string operation, std::string parameter, ActionGro
     add_log_entry("air", did, operation, parameter, should_log);
     ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
 
-    if (operation == "关闭") {
+    if (operation == "关") {
         power_off();
         sync_states();
         return;
