@@ -1,42 +1,40 @@
 #include "room_state.h"
 #include <algorithm>
+#include "commons.h"
 
 void add_state(const std::string& state) {
-    std::lock_guard<std::mutex> lock(state_mutex);  // 加锁保护
-    if (std::find(state_array.begin(), state_array.end(), state) == state_array.end()) {
-        // 如果状态不存在，则添加
-        state_array.push_back(state);
-    }
+    std::lock_guard<std::mutex> lock(state_mutex);
+    state_map[state] = get_current_timestamp();
 }
 
 bool remove_state(const std::string& state) {
-    std::lock_guard<std::mutex> lock(state_mutex);  // 加锁保护
-    auto it = std::find(state_array.begin(), state_array.end(), state);
-    if (it != state_array.end()) {
-        // 如果找到状态，则删除
-        state_array.erase(it);
-        return true;  // 删除成功
-    }
-    return false;  // 未找到，删除失败
+    std::lock_guard<std::mutex> lock(state_mutex);
+    return state_map.erase(state) != 0;
 }
 
 void toggle_state(const std::string &state) {
     std::lock_guard<std::mutex> lock(state_mutex);
-    auto it = std::find(state_array.begin(), state_array.end(), state);
-    if (it != state_array.end()) {
-        state_array.erase(it);  // 如果存在，则删除
-    } else {
-        state_array.push_back(state);  // 如果不存在，则添加
-    }
+
+    auto it = state_map.find(state);
+    if (it != state_map.end())
+        state_map.erase(it);
+    else
+        state_map.emplace(state, get_current_timestamp());
 }
 
 bool exist_state(const std::string &state) {
     std::lock_guard<std::mutex> lock(state_mutex);
-    auto it = std::find(state_array.begin(), state_array.end(), state);
-    return it != state_array.end();
+    return state_map.find(state) != state_map.end();
 }
 
-std::vector<std::string> getRoomStates() {
+nlohmann::json get_states_json() {
     std::lock_guard<std::mutex> lock(state_mutex);
-    return state_array;  // 返回副本
+    nlohmann::json arr = nlohmann::json::array();
+    for (const auto& [name, ts] : state_map) {
+        arr.push_back({
+            {"name", name},
+            {"happentime", static_cast<long long>(ts)}
+        });
+    }
+    return arr;     // 返回的 json 支持复制与移动
 }

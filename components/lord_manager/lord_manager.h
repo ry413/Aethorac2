@@ -64,11 +64,12 @@ public:
 
     // ================ 心跳包 ================
     std::array<uint8_t, 8> getHeartbeatCode() const { return heartbeat_code; }
-    void useAliveHeartBeat() { ESP_LOGI("心跳包", "切换至插卡心跳"); heartbeat_code = alive_heartbeat_code; }
-    void useSleepHeartBeat() { ESP_LOGI("心跳包", "切换至睡眠心跳"); heartbeat_code = sleep_heartbeat_code; }
+    void useAliveHeartBeat() { ESP_LOGI("HEARTBEAT", "切换至插卡心跳"); heartbeat_code = alive_heartbeat_code; }
+    void useSleepHeartBeat() { ESP_LOGI("HEARTBEAT", "切换至睡眠心跳"); heartbeat_code = sleep_heartbeat_code; }
 
     // ================ 按键面板 ================
     void handlePanel(uint8_t panel_id, uint8_t target_buttons, uint8_t old_bl_state);
+    void handleDimming(uint8_t panel_id, uint8_t target_buttons, uint8_t brightness);
     void wishIndicatorAllPanel(bool state);   // 希望操作所有面板的指示灯
     
     // ================ 语音指令 ================

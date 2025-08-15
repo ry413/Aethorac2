@@ -79,7 +79,7 @@ void report_op_logs(void) {
             mqtt_publish_message(json.dump(), 0, 0);
         }
     } else {
-        ESP_LOGI(TAG, "日志数组为空, 无需发送");
+        // ESP_LOGI(TAG, "日志数组为空, 无需发送");
     }
 }
 

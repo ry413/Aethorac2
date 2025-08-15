@@ -558,7 +558,7 @@ json generateReportStates() {
         }
 
         j["mode"] = lord.getLastModeName();
-        j["states"] = getRoomStates();
+        j["states"] = get_states_json();
     } catch (const std::exception& e) {
         ESP_LOGE(TAG, "生成状态报告时出错: %s", e.what());
     }

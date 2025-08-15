@@ -13,6 +13,8 @@
 
 #include "mqtt_secrets.h"
 #include "stm32_tx.h"
+#include "stm32_rx.h"
+#include "rs485_comm.h"
 #include "lord_manager.h"
 #include "indicator.h"
 #include "commons.h"
@@ -350,7 +352,9 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                 }
                 return;
             } else if (type == "oracle") {
+                ESP_LOGI("ORACLE", "mqtt: %s", lines[1].data());
                 auto msg = json::parse(lines[1]);
+
                 if (msg.is_object()) {
                     if (msg.contains("operation") && msg["operation"].is_string()) {
                         std::string operation = msg["operation"].get<std::string>();
@@ -389,6 +393,44 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                         }
                         else if (operation == "ver") {
                             urgentPublishDebugLog(AETHORAC_VERSION);
+                        }
+                        else if (operation == "rs485_print") {
+                            if (msg.contains("state") && msg["state"].is_string()) {
+                                std::string state = msg["state"].get<std::string>();
+                                int state_int = std::stoi(state);
+
+                                if (state_int == 1) {
+                                    global_RS485_log_enable_flag = true;
+                                } else {
+                                    global_RS485_log_enable_flag = false;
+                                }
+                            }
+                        }
+                        else if (operation == "stm32_print") {
+                            if (msg.contains("state") && msg["state"].is_string()) {
+                                std::string state = msg["state"].get<std::string>();
+                                int state_int = std::stoi(state);
+
+                                if (state_int == 1) {
+                                    global_STM32_log_enable_flag = true;
+                                } else {
+                                    global_STM32_log_enable_flag = false;
+                                }
+                            }
+                        }
+                        else if (operation == "input_channel_ctl") {
+                            if (msg.contains("target") && msg["target"].is_string() &&
+                                msg.contains("state") && msg["state"].is_string()) {
+                                std::string target = msg["target"].get<std::string>();
+                                int target_int = std::stoi(target);
+                                
+                                std::string state = msg["state"].get<std::string>();
+                                int state_int = std::stoi(state);
+
+                                uart_frame_t frame;
+                                build_frame(CMD_DRYCONTACT_INPUT, 0x00, target_int, state_int, 0x00, &frame);
+                                handle_response(&frame);
+                            }
                         }
                     }
                 }

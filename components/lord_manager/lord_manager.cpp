@@ -164,6 +164,14 @@ void LordManager::handlePanel(uint8_t panel_id, uint8_t target_buttons, uint8_t 
     }
 }
 
+void LordManager::handleDimming(uint8_t panel_id, uint8_t target_buttons, uint8_t brightness) {
+    if (auto panel = getPanelByPid(panel_id); panel) {
+        panel->dimmingReport(target_buttons, brightness);
+    } else {
+        ESP_LOGW(TAG, "id为%d的面板不存在", panel_id);
+    }
+}
+
 void LordManager::wishIndicatorAllPanel(bool state) {
     for (const auto& [pid, panel_ptr] : panels_map) {
         if (panel_ptr) {

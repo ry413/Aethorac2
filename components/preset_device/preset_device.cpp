@@ -106,6 +106,10 @@ void PresetDevice::execute(std::string operation, std::string parameter, ActionG
         case DeviceType::SNAPSHOT: {
             if (operation == "记录快照") {
                 for(auto* dev : lord.getDevicesByType<IDevice>()) {
+                    // 跳过预设设备
+                    if (dynamic_cast<PresetDevice*>(dev) != nullptr) {
+                        continue;
+                    }
                     all_device_onoff_snapshot[dev->getDid()] = dev->isOn();
                 }
             } else if (operation == "读取并删除快照") {

@@ -54,6 +54,7 @@ public:
 
     // 处理485发来的开关上报码, 真正的处理函数
     void switchReport(uint8_t target_buttons, uint8_t old_bl_state);
+    void dimmingReport(uint8_t target_buttons, uint8_t brightness);
 
     // 短亮按键指示灯用的临时储存点
     std::vector<uint8_t> short_light_bids;

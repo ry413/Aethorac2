@@ -164,3 +164,7 @@ void Panel::switchReport(uint8_t target_buttons, uint8_t old_bl_state) {
 
     // 不在这操作指示灯, 在动作组执行完成后用Indicator一并更新
 }
+
+void Panel::dimmingReport(uint8_t target_buttons, uint8_t brightness) {
+    
+}

@@ -14,7 +14,6 @@
 #include "air_conditioner.h"
 #include "stm32_tx.h"
 #include "stm32_rx.h"
-#include "network.h"
 #include "identity.h"
 
 #define TAG "RS485"
@@ -183,6 +182,11 @@ void handle_rs485_data(uint8_t* data, int length) {
     static auto& lord = LordManager::instance();
     // 开关上报
     if (data[1] == SWITCH_REPORT) {
+        // 百分比调光上报
+        if (data[2] == 0x01) {
+            lord.handleDimming(data[3], data[4], data[5]);
+            return;
+        }
         lord.handlePanel(data[3], data[4], data[5]);
     }
     // 语音控制
