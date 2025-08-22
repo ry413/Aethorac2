@@ -1,3 +1,15 @@
+## [1.0.5] - 2025-08-22
+### Added
+- 添加了 `InputTag::IGNORE_ANY_KEY_EXECUTE`, 用于让某些输入无视任意键执行
+- `PresetDevice::execute` 中, 现在会在添加 `SOS` 状态时立即上报状态
+
+### Changed
+- 现在空调的 `execute` 收到 `"打开"` 或 `"开"` 时, 会固定使用全局空调默认配置
+- 优化了动作组被外部中断时的自杀逻辑, 现在不会被 `DeviceType::DELAYER` 阻塞自杀了
+
+### Fixed
+- 修复了空调根本不处理 `开` 和 `关` 的问题
+
 ## [1.0.4] - 2025-08-15
 ### Added
 - 为mqtt添加了一些新的ORACLE协议

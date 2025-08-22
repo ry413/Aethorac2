@@ -76,7 +76,7 @@ void SinglePipeFCU::execute(std::string operation, std::string parameter, Action
     ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s] param[%s]", name.c_str(), operation.c_str(), parameter.c_str());
 
     // 直接处理关闭
-    if (operation == "关") {
+    if (operation == "关" || operation == "关闭") {
         power_off();
         sync_states();
         return;
@@ -86,7 +86,12 @@ void SinglePipeFCU::execute(std::string operation, std::string parameter, Action
     is_running.store(true);
     xTimerStop(shutdown_after_timer, 0);
 
-    if (operation == "制冷") {
+    // 这种方式打开空调时, 固定使用全局默认配置的目标温度和风速
+    if (operation == "开" || operation == "打开") {
+        target_temp.store(AirConGlobalConfig::getInstance().default_target_temp);
+        fan_speed.store(AirConGlobalConfig::getInstance().default_fan_speed);
+        mode.store(AirConGlobalConfig::getInstance().default_mode);
+    } else if (operation == "制冷") {
         mode.store(ACMode::COOLING);
     } else if (operation == "制热") {
         mode.store(ACMode::HEATING);
@@ -372,15 +377,18 @@ void InfraredAC::execute(std::string operation, std::string parameter, ActionGro
     add_log_entry("air", did, operation, parameter, should_log);
     ESP_LOGI_CYAN(TAG, "空调[%s] 收到操作[%s]", name.c_str(), operation.c_str());
 
-    if (operation == "关") {
+    if (operation == "关" || operation == "关闭") {
         power_off();
         sync_states();
         return;
     }
 
     is_running.store(true);
-
-    if (operation == "制冷") {
+    if (operation == "开" || operation == "打开") {
+        target_temp.store(AirConGlobalConfig::getInstance().default_target_temp);
+        fan_speed.store(AirConGlobalConfig::getInstance().default_fan_speed);
+        mode.store(AirConGlobalConfig::getInstance().default_mode);
+    } else if (operation == "制冷") {
         mode.store(ACMode::COOLING);
     } else if (operation == "制热") {
         mode.store(ACMode::HEATING);

@@ -1,4 +1,5 @@
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include <esp_log.h>
 #include "action_group.h"
 #include "idevice.h"
@@ -13,8 +14,13 @@ static void executeAllAtomicActionTask(void* pvParameter) {
     ActionGroup* self = static_cast<ActionGroup*>(pvParameter);
 
     for (const auto& atomic_action : self->actions) {
-        if (ulTaskNotifyTake(pdTRUE, 0) > 0) {
-            ESP_LOGW(TAG, "任务收到中断通知，中止执行");
+        uint32_t v = 0;
+        if (xTaskNotifyWait(0, ActionGroup::CANCEL_BIT, &v, 0) == pdTRUE && (v & ActionGroup::CANCEL_BIT)) {
+            ESP_LOGW(TAG, "任务收到取消信号，中止执行");
+            break;
+        }
+        if (self->cancelled()) {
+            ESP_LOGW(TAG, "检测到取消标志，中止执行");
             break;
         }
         if (atomic_action.target_device) {
@@ -47,6 +53,8 @@ void ActionGroup::executeAllAtomicAction() {
         add_log_entry("mode", 0, "进入" + name, "");
     }
 
+    cancel_flag = false;
+
     // 创建新任务
     BaseType_t ret = xTaskCreate(
         executeAllAtomicActionTask,
@@ -71,8 +79,27 @@ void ActionGroup::clearTaskHandle() {
 void ActionGroup::suicide() {
     // 在销毁此动作组前更新指示灯
     IndicatorHolder::getInstance().callAllAndClear();
+    request_cancel();
+}
+
+bool ActionGroup::delay_ms(uint32_t ms) {
+    if (cancel_flag) return false;
+    uint32_t v = 0;
+    BaseType_t hit = xTaskNotifyWait(0, CANCEL_BIT, &v, pdMS_TO_TICKS(ms));
+    if ((hit == pdTRUE && (v & CANCEL_BIT)) || cancel_flag) {
+        return false; // 被取消
+    }
+    return true; // 正常睡满
+}
+
+void ActionGroup::request_cancel() {
+    cancel_flag = true;
     if (task_handle != nullptr) {
-        ESP_LOGI(TAG, "请求中断任务执行");
-        xTaskNotifyGive(task_handle);
+        #if (INCLUDE_xTaskAbortDelay == 1)
+        // 如果当前在 vTaskDelay 中，立刻唤醒
+        xTaskAbortDelay(task_handle);
+        #endif
+        // 置位取消位，唤醒任何 xTaskNotifyWait
+        xTaskNotify(task_handle, CANCEL_BIT, eSetBits);
     }
 }

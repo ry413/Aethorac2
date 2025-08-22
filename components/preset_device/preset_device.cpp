@@ -10,6 +10,7 @@
 #include "room_state.h"
 #include "relay_out.h"
 #include "drycontact_out.h"
+#include "my_mqtt.h"
 
 #define TAG "PRESET_DEVICE"
 std::unordered_map<uint16_t, bool> all_device_onoff_snapshot = {};  // <did, isOn> 房间设备快照
@@ -49,6 +50,10 @@ void PresetDevice::execute(std::string operation, std::string parameter, ActionG
         case DeviceType::ROOM_STATE:
             if (operation == "添加") {
                 add_state(parameter);
+                // 如果是SOS, 立即上报状态
+                if (parameter == "SOS") {
+                    report_states();;
+                }
             } else if (operation == "删除") {
                 remove_state(parameter);
             } else if (operation == "反转") {
@@ -75,7 +80,14 @@ void PresetDevice::execute(std::string operation, std::string parameter, ActionG
                 ESP_LOGI(TAG, "延时%d秒\n", delay);
                 // 在进入延时前先发布已注册的指示灯函数
                 IndicatorHolder::getInstance().callAllAndClear();
-                vTaskDelay(delay * 1000 / portTICK_PERIOD_MS);
+                if (self_action_group) {
+                    if (!self_action_group->delay_ms(delay * 1000)) {
+                        ESP_LOGW(TAG, "延时被取消，中止后续动作");
+                        break;
+                    }
+                } else {
+                    vTaskDelay(delay * 1000 / portTICK_PERIOD_MS);
+                }
             }
             break;
         case DeviceType::ACTION_GROUP_OP: {

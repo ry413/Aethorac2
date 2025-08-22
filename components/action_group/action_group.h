@@ -27,6 +27,12 @@ public:
     const std::string& getName() const { return name; }
     bool is_mode() const { return mode; }
 
+    // 取消/可中断延时接口
+    static constexpr uint32_t CANCEL_BIT = 0x1;   // 任务通知位：取消
+    bool delay_ms(uint32_t ms);                   // 可被取消的睡眠，true=睡满，false=被取消
+    void request_cancel();                        // 请求取消（唤醒正在睡眠的任务）
+    bool cancelled() const { return cancel_flag; }
+
     void executeAllAtomicAction();
     void clearTaskHandle();
     void suicide();
@@ -36,5 +42,6 @@ private:
     uint16_t aid;
     std::string name;
     bool mode;
+    volatile bool cancel_flag = false;            // 取消标志
     TaskHandle_t task_handle = nullptr;
 };
