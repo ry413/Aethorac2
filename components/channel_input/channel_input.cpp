@@ -20,7 +20,8 @@ void ChannelInput::execute() {
         }
     }
     
-    if (lord.execute_any_key_action_group()) {
+    // 虽然不知道不知道为什么ChannelInput会有这个, 但同样可以实现
+    if (tag != InputTag::IGNORE_ANY_KEY_EXECUTE && lord.execute_any_key_action_group()) {
         printf("已调用任意键执行动作组, 返回\n");
     } else if (current_index < action_groups.size()) {
         action_groups[current_index]->executeAllAtomicAction();

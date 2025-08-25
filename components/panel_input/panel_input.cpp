@@ -14,7 +14,7 @@ void PanelButtonInput::execute() {
 
     // 任意键执行得放在getAlive检测前面, 因为红外超时导致错误拔卡, 需要可以用面板返回插卡状态
     // 如果有"无视任意键"的tag就跳过
-    if (lord.execute_any_key_action_group() && tag != InputTag::IGNORE_ANY_KEY_EXECUTE) {
+    if (tag != InputTag::IGNORE_ANY_KEY_EXECUTE && lord.execute_any_key_action_group()) {
         printf("已调用任意键执行动作组, 返回\n");
 
         // 只要按下按钮, 就试图唤醒

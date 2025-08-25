@@ -118,7 +118,7 @@ static void report_operation_task(void *param) {
     vTaskDelete(nullptr);
 }
 
-static void report_after_ota(void) {
+static void report_firmware_status(const char* reason) {
     const esp_partition_t *part = esp_ota_get_running_partition();
     const esp_app_desc_t  *app  = esp_app_get_description();
 
@@ -126,17 +126,17 @@ static void report_after_ota(void) {
     esp_ota_get_state_partition(part, &st);
 
     char sha8[9];
-    sprintf(sha8, "%02x%02x%02x%02x",
+    snprintf(sha8, sizeof(sha8), "%02x%02x%02x%02x",
             app->app_elf_sha256[0],
             app->app_elf_sha256[1],
             app->app_elf_sha256[2],
             app->app_elf_sha256[3]);
-    sha8[8] = '\0';
-    
+
     char msg[256];
     snprintf(msg, sizeof(msg),
-            "OTA_OK | part=%s | ver=%s | sha=%.8s | build=%s %s | "
+            "%s | part=%s | ver=%s | sha=%.8s | build=%s %s | "
             "state=%s | heap=%lu/%lu",
+            reason ? reason : "FW_STATUS",
             part->label,
             app->version,
             sha8,
@@ -145,8 +145,8 @@ static void report_after_ota(void) {
             (st==ESP_OTA_IMG_PENDING_VERIFY)?"PENDING":
             (st==ESP_OTA_IMG_INVALID)?"INVALID":"ABORTED",
             esp_get_free_heap_size(), esp_get_minimum_free_heap_size());
-    printf("OTA-POST: %s\n", msg);
-    ESP_LOGI("OTA-POST", "%s", msg);
+    printf("%s\n", msg);
+    ESP_LOGI("FW-POST", "%s", msg);
 }
 
 static void register_the_rcu();
@@ -184,9 +184,9 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "日志已重定向至mqtt");
         xTaskCreate([](void *param) {            
             vTaskDelay(pdMS_TO_TICKS(3000));
-            report_after_ota();
+            report_firmware_status("");
             vTaskDelete(nullptr);
-        }, "report_after_ota_task", 4096, nullptr, 3, nullptr);
+        }, "report_fireware_status_task", 4096, nullptr, 3, nullptr);
         break;
     }
     case MQTT_EVENT_DISCONNECTED: {
@@ -391,9 +391,12 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                                 }
                             }
                         }
+                        // 查询固件信息
                         else if (operation == "ver") {
                             urgentPublishDebugLog(AETHORAC_VERSION);
+                            report_firmware_status("");
                         }
+                        // 开关rs485日志打印
                         else if (operation == "rs485_print") {
                             if (msg.contains("state") && msg["state"].is_string()) {
                                 std::string state = msg["state"].get<std::string>();
@@ -406,6 +409,7 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                                 }
                             }
                         }
+                        // 开关stm32日志打印
                         else if (operation == "stm32_print") {
                             if (msg.contains("state") && msg["state"].is_string()) {
                                 std::string state = msg["state"].get<std::string>();
@@ -418,6 +422,7 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                                 }
                             }
                         }
+                        // 控制干接点输入
                         else if (operation == "input_channel_ctl") {
                             if (msg.contains("target") && msg["target"].is_string() &&
                                 msg.contains("state") && msg["state"].is_string()) {
@@ -431,6 +436,12 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                                 build_frame(CMD_DRYCONTACT_INPUT, 0x00, target_int, state_int, 0x00, &frame);
                                 handle_response(&frame);
                             }
+                        }
+                        // 重启
+                        else if (operation == "restart") {
+                            ESP_LOGI(TAG, "收到重启命令, 准备重启");
+                            vTaskDelay(pdMS_TO_TICKS(2000));
+                            esp_restart();
                         }
                     }
                 }

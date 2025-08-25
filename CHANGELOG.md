@@ -1,3 +1,14 @@
+## [1.0.6] - 2025-08-25
+### Added
+- 现在 `ChannelInput` 的任意键执行也会被 `InputTag::IGNORE_ANY_KEY_EXECUTE` 拦截了
+- 添加新Oracle `restart` 
+
+### Changed
+- 将 `report_after_ota` 改为了 `report_firmware_status`
+
+### Fixed
+- 修复了持有 `InputTag::IGNORE_ANY_KEY_EXECUTE` tag的输入并没有忽略任意键执行的问题
+
 ## [1.0.5] - 2025-08-22
 ### Added
 - 添加了 `InputTag::IGNORE_ANY_KEY_EXECUTE`, 用于让某些输入无视任意键执行
