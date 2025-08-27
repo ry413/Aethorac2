@@ -4,6 +4,7 @@
 #include <vector>
 #include "enums.h"
 #include "action_group.h"
+#include "esp_log.h"
 
 struct PanelButtonPair {
     uint8_t panel_id;
@@ -19,7 +20,7 @@ public:
     virtual ~IDevice() = default;
     virtual void execute(std::string operation, std::string parameter, ActionGroup* self_action_group = nullptr, bool should_log = false) = 0;
     virtual void addAssBtn(PanelButtonPair) = 0;// 添加关联按钮(按键指示灯)至本设备
-    virtual void syncAssBtnToDevState() { updateButtonIndicator(isOn()); }        // 将本设备可能拥有的关联按键的指示灯, 调整至本设备的onoff状态
+    virtual void syncAssBtnToDevState() { ESP_LOGW("IDevice", "基类方法不该被调用到"); } // 将本设备可能拥有的关联按键的指示灯, 调整至本设备的onoff状态
     virtual bool isOn() const = 0;
     bool isOperated(void) { return operated_flag; };
     uint16_t getDid()  const { return did;  }

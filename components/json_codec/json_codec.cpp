@@ -109,27 +109,27 @@ void parseLocalLogicConfig(void) {
     yyjson_val* common_config_root = yyjson_doc_get_root(common_config_doc);
     printCurrentFreeMemory();
     if (yyjson_val* common_config_obj = yyjson_obj_get(common_config_root, "c"); yyjson_is_obj(common_config_obj)) {
-        if (yyjson_val* air_config_obj = yyjson_obj_get(common_config_obj, "airConfig")) {
-            auto& air_config = AirConGlobalConfig::getInstance();
-            air_config.default_target_temp = json_get_int_safe(air_config_obj, "defaultTargetTemp", 26);
-            air_config.default_mode = static_cast<ACMode>(json_get_int_safe(air_config_obj, "defaultMode", 0));
-            air_config.default_fan_speed = static_cast<ACFanSpeed>(json_get_int_safe(air_config_obj, "defaultFanSpeed", 0));
-            air_config.stop_threshold = json_get_int_safe(air_config_obj, "stopThreshold", 1);
-            air_config.rework_threshold = json_get_int_safe(air_config_obj, "reworkThreshold", 1);
-            air_config.stop_action = static_cast<ACStopAction>(json_get_int_safe(air_config_obj, "stopAction", 0));
-            air_config.remove_card_air_usable = json_get_bool_safe(air_config_obj, "removeCardAirUsable", false);
-            if (yyjson_val* auto_fan_obj = yyjson_obj_get(air_config_obj, "autoFan"); yyjson_is_obj(auto_fan_obj)) {
-                air_config.low_diff = json_get_int_safe(auto_fan_obj, "lowFanTempDiff", 2);
-                air_config.high_diff = json_get_int_safe(auto_fan_obj, "highFanTempDiff", 2);
-                air_config.auto_fun_wind_speed = static_cast<ACFanSpeed>(json_get_int_safe(auto_fan_obj, "autoVentFanSpeed", 1));
-            } else {
-                ESP_LOGW(TAG, "配置[autoFan]错误");
-            }
-            air_config.shutdown_after_duration = json_get_int_safe(air_config_obj, "shutdownAfterDuration", 0);
-            air_config.shutdown_after_fan_speed = static_cast<ACFanSpeed>(json_get_int_safe(air_config_obj, "shutdownAfterFanSpeed", 0));
-        } else {
-            ESP_LOGW(TAG, "配置[airConfig]错误");
-        }
+        // if (yyjson_val* air_config_obj = yyjson_obj_get(common_config_obj, "airConfig")) {
+        //     auto& air_config = AirConGlobalConfig::getInstance();
+        //     air_config.default_target_temp = json_get_int_safe(air_config_obj, "defaultTargetTemp", 26);
+        //     air_config.default_mode = static_cast<ACMode>(json_get_int_safe(air_config_obj, "defaultMode", 0));
+        //     air_config.default_fan_speed = static_cast<ACFanSpeed>(json_get_int_safe(air_config_obj, "defaultFanSpeed", 0));
+        //     air_config.stop_threshold = json_get_int_safe(air_config_obj, "stopThreshold", 1);
+        //     air_config.rework_threshold = json_get_int_safe(air_config_obj, "reworkThreshold", 1);
+        //     air_config.stop_action = static_cast<ACStopAction>(json_get_int_safe(air_config_obj, "stopAction", 0));
+        //     air_config.remove_card_air_usable = json_get_bool_safe(air_config_obj, "removeCardAirUsable", false);
+        //     if (yyjson_val* auto_fan_obj = yyjson_obj_get(air_config_obj, "autoFan"); yyjson_is_obj(auto_fan_obj)) {
+        //         air_config.low_diff = json_get_int_safe(auto_fan_obj, "lowFanTempDiff", 2);
+        //         air_config.high_diff = json_get_int_safe(auto_fan_obj, "highFanTempDiff", 2);
+        //         air_config.auto_fun_wind_speed = static_cast<ACFanSpeed>(json_get_int_safe(auto_fan_obj, "autoVentFanSpeed", 1));
+        //     } else {
+        //         ESP_LOGW(TAG, "配置[autoFan]错误");
+        //     }
+        //     air_config.shutdown_after_duration = json_get_int_safe(air_config_obj, "shutdownAfterDuration", 0);
+        //     air_config.shutdown_after_fan_speed = static_cast<ACFanSpeed>(json_get_int_safe(air_config_obj, "shutdownAfterFanSpeed", 0));
+        // } else {
+        //     ESP_LOGW(TAG, "配置[airConfig]错误");
+        // }
     } else {
         ESP_LOGW(TAG, "配置[c]错误");
     }

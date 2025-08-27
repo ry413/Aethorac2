@@ -10,6 +10,7 @@ public:
 
     void execute(std::string operation, std::string parameter, ActionGroup* self_action_group = nullptr, bool should_log = false) override;
     void addAssBtn(PanelButtonPair pair) override { associated_buttons.push_back(pair); }
+    void syncAssBtnToDevState() override;
     bool isOn() const override { return current_state == State::ON; }
 protected:
     uint8_t channel;

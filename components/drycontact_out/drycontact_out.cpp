@@ -20,6 +20,10 @@ void DryContactOut::execute(std::string operation, std::string parameter, Action
     }
 }
 
+void DryContactOut::syncAssBtnToDevState() {
+    updateButtonIndicator(isOn());
+}
+
 void DryContactOut::open_self(bool should_log) {
     controlDrycontactOut(channel, true);
     current_state = State::ON;

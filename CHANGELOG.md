@@ -1,3 +1,10 @@
+## [1.0.7] - 2025-08-27
+### Changed
+- 把空调全局配置从json文件移到了nvs里, 现在使用mqtt修改, 可以单条修改
+
+### Fixed
+- 修复了任意键执行后不会同步设备状态至面板指示灯的问题( `syncAssBtnToDevState` )
+
 ## [1.0.6] - 2025-08-25
 ### Added
 - 现在 `ChannelInput` 的任意键执行也会被 `InputTag::IGNORE_ANY_KEY_EXECUTE` 拦截了

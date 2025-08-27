@@ -17,6 +17,7 @@
 
 #include "commons.h"
 #include "identity.h"
+#include "air_conditioner.h"
 #include "json_codec.h"
 
 #define TAG "app_main"
@@ -90,6 +91,7 @@ extern "C" void app_main(void) {
 
         printCurrentFreeMemory("开始解析配置");
         parseLocalLogicConfig();
+        AirConGlobalConfig::getInstance().load();
         printCurrentFreeMemory("开始联网");
         restore_last_network();
         vTaskDelete(nullptr);

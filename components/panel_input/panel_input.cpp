@@ -4,6 +4,7 @@
 #include "indicator.h"
 #include "lord_manager.h"
 #include "drycontact_out.h"
+#include "lamp.h"
 
 #define TAG "PANEL_INPUT"
 PanelButtonInput *last_press_btn;
@@ -23,11 +24,18 @@ void PanelButtonInput::execute() {
             lord.useAliveHeartBeat();
             // 睡眠会将所有指示灯熄灭, 但有些设备实际上并没有被"关"
             // 所以在醒来后, 要再点亮那些设备的指示灯
-            // 应该只会有干接点输出, 即清理和勿扰两个东西
+            for (auto* dry : lord.getDevicesByType<Lamp>()) {
+                dry->syncAssBtnToDevState();
+            }
+            for (auto* dry : lord.getDevicesByType<SingleRelayDevice>()) {
+                dry->syncAssBtnToDevState();
+            }
             for (auto* dry : lord.getDevicesByType<DryContactOut>()) {
                 dry->syncAssBtnToDevState();
             }
         }
+        // 在return前发布已注册的指示灯函数
+        IndicatorHolder::getInstance().callAllAndClear();
         return;
     }
 
@@ -39,6 +47,12 @@ void PanelButtonInput::execute() {
     // 无任意键执行时, 也要一次这个
     if (lord.isSleep() && lord.getAlive()) {
         lord.useAliveHeartBeat();
+        for (auto* dry : lord.getDevicesByType<Lamp>()) {
+            dry->syncAssBtnToDevState();
+        }
+        for (auto* dry : lord.getDevicesByType<SingleRelayDevice>()) {
+            dry->syncAssBtnToDevState();
+        }
         for (auto* dry : lord.getDevicesByType<DryContactOut>()) {
             dry->syncAssBtnToDevState();
         }

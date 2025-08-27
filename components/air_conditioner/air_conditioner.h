@@ -47,20 +47,46 @@ public:
     AirConGlobalConfig(const AirConGlobalConfig&) = delete;
     AirConGlobalConfig& operator=(const AirConGlobalConfig&) = delete;
 
-    uint8_t default_target_temp;        // 默认目标温度
-    ACMode default_mode;                // 默认模式
-    ACFanSpeed default_fan_speed;       // 默认风速
-    uint8_t stop_threshold;             // 超出目标温度后停止工作的阈值
-    uint8_t rework_threshold;           // 回温后重新开始工作的阈值
-    ACStopAction stop_action;           // 达到目标温度停止工作应该怎么停
-    bool remove_card_air_usable;        // 拔卡时是否允许操作空调
-    uint8_t low_diff;                   // 风速: 自动时, 进入低风所需小于等于的温差
-    uint8_t high_diff;                  // 温差大于等于以进入高风
-    ACFanSpeed auto_fun_wind_speed;     // (风速: AUTO, 模式: 通风) 这个状态时, 应该开什么风速
-    uint16_t shutdown_after_duration;   // 盘管空调关机后还要吹的时长
-    ACFanSpeed shutdown_after_fan_speed;// 盘管空调关机后还要吹的风速
+    uint8_t default_target_temp = 26;                           // 默认目标温度
+    ACMode default_mode = ACMode::COOLING;                      // 默认模式
+    ACFanSpeed default_fan_speed = ACFanSpeed::MEDIUM;          // 默认风速
+    uint8_t stop_threshold = 1;                                 // 超出目标温度后停止工作的阈值
+    uint8_t rework_threshold = 1;                               // 回温后重新开始工作的阈值
+    ACStopAction stop_action = ACStopAction::CLOSE_ALL;         // 达到目标温度停止工作应该怎么停
+    bool remove_card_air_usable = false;                        // 拔卡时是否允许操作空调
+    uint8_t low_diff = 2;                                       // [风速: 自动]时, 进入低风所需小于等于的温差
+    uint8_t high_diff = 4;                                      // [风速: 自动]时, 进入高风所需大于等于的温度
+    ACFanSpeed auto_fun_wind_speed = ACFanSpeed::MEDIUM;        // (风速: AUTO, 模式: 通风) 这个状态时, 应该开什么风速
+    uint16_t shutdown_after_duration = 30;                      // 盘管空调关机后还要吹的时长
+    ACFanSpeed shutdown_after_fan_speed = ACFanSpeed::MEDIUM;   // 盘管空调关机后还要吹的风速
+
+    esp_err_t load();
+    esp_err_t save();
+
 private:
     AirConGlobalConfig() = default;
+
+    static constexpr const char* NS  = "aircon";
+    static constexpr const char* KEY = "cfg";
+
+    // 紧凑的存盘结构（整块 blob）
+    struct Blob {
+        uint8_t default_target_temp;
+        uint8_t default_mode;              // enum 存为 uint8_t
+        uint8_t default_fan_speed;
+        uint8_t stop_threshold;
+        uint8_t rework_threshold;
+        uint8_t stop_action;
+        uint8_t remove_card_air_usable;    // bool -> uint8_t
+        uint8_t low_diff;
+        uint8_t high_diff;
+        uint8_t auto_fun_wind_speed;
+        uint16_t shutdown_after_duration;
+        uint8_t shutdown_after_fan_speed;
+    };
+
+    Blob toBlob() const;
+    void fromBlob(const Blob& b);
 };
 
 class AirConBase : public IDevice {

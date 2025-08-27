@@ -6,6 +6,7 @@
 #include "lord_manager.h"
 #include "drycontact_out.h"
 #include "esp_timer.h"
+#include <lamp.h>
 
 #define TAG "CHANNEL_INPUT"
 
@@ -15,6 +16,12 @@ void ChannelInput::execute() {
 
     if (lord.isSleep()) {
         lord.useAliveHeartBeat();
+        for (auto* dry : lord.getDevicesByType<Lamp>()) {
+            dry->syncAssBtnToDevState();
+        }
+        for (auto* dry : lord.getDevicesByType<SingleRelayDevice>()) {
+            dry->syncAssBtnToDevState();
+        }
         for (auto* dry : lord.getDevicesByType<DryContactOut>()) {
             dry->syncAssBtnToDevState();
         }

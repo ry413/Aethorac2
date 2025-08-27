@@ -23,6 +23,7 @@
 #include "my_mqtt.h"
 #include "json_codec.h"
 #include "../json.hpp"
+#include <air_conditioner.h>
 
 
 static const char *TAG = "mqtt";
@@ -393,8 +394,11 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                         }
                         // 查询固件信息
                         else if (operation == "ver") {
-                            urgentPublishDebugLog(AETHORAC_VERSION);
-                            report_firmware_status("");
+                            xTaskCreate([](void *param) {
+                                vTaskDelay(pdMS_TO_TICKS(1000));
+                                report_firmware_status("");
+                                vTaskDelete(nullptr);
+                            }, "report_fireware_status_task", 4096, nullptr, 3, nullptr);
                         }
                         // 开关rs485日志打印
                         else if (operation == "rs485_print") {
@@ -501,6 +505,79 @@ static void handle_mqtt_ndjson(const char* data, size_t data_len) {
                         }
                         nvs_close(handle);
                         register_the_rcu();
+                    }
+                }
+                return;
+            } else if (type == "air_cfg") {
+                auto msg = json::parse(lines[1]);
+                if (msg.is_object()) {
+                    ESP_LOGI(TAG, "通过网络收到空调配置");
+                    auto& air_config = AirConGlobalConfig::getInstance();
+                    bool changed = false;
+
+                    if (msg.contains("defaultTargetTemp") && msg["defaultTargetTemp"].is_number_integer()) {
+                        air_config.default_target_temp = static_cast<uint8_t>(msg["defaultTargetTemp"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("defaultMode") && msg["defaultMode"].is_number_integer()) {
+                        air_config.default_mode = static_cast<ACMode>(msg["defaultMode"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("defaultFanSpeed") && msg["defaultFanSpeed"].is_number_integer()) {
+                        air_config.default_fan_speed = static_cast<ACFanSpeed>(msg["defaultFanSpeed"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("stopThreshold") && msg["stopThreshold"].is_number_integer()) {
+                        air_config.stop_threshold = static_cast<uint8_t>(msg["stopThreshold"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("reworkThreshold") && msg["reworkThreshold"].is_number_integer()) {
+                        air_config.rework_threshold = static_cast<uint8_t>(msg["reworkThreshold"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("stopAction") && msg["stopAction"].is_number_integer()) {
+                        air_config.stop_action = static_cast<ACStopAction>(msg["stopAction"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("shutdownAfterDuration") && msg["shutdownAfterDuration"].is_number_integer()) {
+                        air_config.shutdown_after_duration = static_cast<uint16_t>(msg["shutdownAfterDuration"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("shutdownAfterFanSpeed") && msg["shutdownAfterFanSpeed"].is_number_integer()) {
+                        air_config.shutdown_after_fan_speed = static_cast<ACFanSpeed>(msg["shutdownAfterFanSpeed"].get<int>());
+                        changed = true;
+                    }
+                    if (msg.contains("removeCardAirUsable") && msg["removeCardAirUsable"].is_boolean()) {
+                        air_config.remove_card_air_usable = msg["removeCardAirUsable"].get<bool>();
+                        changed = true;
+                    }
+                    // 嵌套 autoFan
+                    if (msg.contains("autoFan") && msg["autoFan"].is_object()) {
+                        const auto& af = msg["autoFan"];
+                        if (af.contains("lowFanTempDiff") && af["lowFanTempDiff"].is_number_integer()) {
+                            air_config.low_diff = static_cast<uint8_t>(af["lowFanTempDiff"].get<int>());
+                            changed = true;
+                        }
+                        if (af.contains("highFanTempDiff") && af["highFanTempDiff"].is_number_integer()) {
+                            air_config.high_diff = static_cast<uint8_t>(af["highFanTempDiff"].get<int>());
+                            changed = true;
+                        }
+                        if (af.contains("autoVentFanSpeed") && af["autoVentFanSpeed"].is_number_integer()) {
+                            air_config.auto_fun_wind_speed = static_cast<ACFanSpeed>(af["autoVentFanSpeed"].get<int>());
+                            changed = true;
+                        }
+                    }
+
+                    if (changed) {
+                        esp_err_t err = air_config.save();
+                        if (err == ESP_OK) {
+                            ESP_LOGI(TAG, "空调配置已更新并保存");
+                            air_config.load();  // 重新应用
+                        } else {
+                            ESP_LOGE(TAG, "空调配置保存失败: %s", esp_err_to_name(err));
+                        }
+                    } else {
+                        ESP_LOGI(TAG, "空调配置未变化或无有效字段");
                     }
                 }
                 return;

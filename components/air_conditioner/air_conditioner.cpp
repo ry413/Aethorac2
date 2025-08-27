@@ -8,6 +8,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/timers.h>
+#include "nvs_flash.h"
 
 #include "air_conditioner.h"
 #include "lord_manager.h"
@@ -549,4 +550,67 @@ static std::string fanSpeedBitsToName(uint8_t fan_speed_bits) {
             ESP_LOGE(TAG, "未知风速位: 0x%2x", fan_speed_bits);
             return "未知风速";
     }
+}
+
+AirConGlobalConfig::Blob AirConGlobalConfig::toBlob() const {
+    return Blob{
+        default_target_temp,
+        static_cast<uint8_t>(default_mode),
+        static_cast<uint8_t>(default_fan_speed),
+        stop_threshold,
+        rework_threshold,
+        static_cast<uint8_t>(stop_action),
+        static_cast<uint8_t>(remove_card_air_usable),
+        low_diff,
+        high_diff,
+        static_cast<uint8_t>(auto_fun_wind_speed),
+        shutdown_after_duration,
+        static_cast<uint8_t>(shutdown_after_fan_speed),
+    };
+}
+
+void AirConGlobalConfig::fromBlob(const Blob& b) {
+    default_target_temp      = b.default_target_temp;
+    default_mode             = static_cast<ACMode>(b.default_mode);
+    default_fan_speed        = static_cast<ACFanSpeed>(b.default_fan_speed);
+    stop_threshold           = b.stop_threshold;
+    rework_threshold         = b.rework_threshold;
+    stop_action              = static_cast<ACStopAction>(b.stop_action);
+    remove_card_air_usable   = (b.remove_card_air_usable != 0);
+    low_diff                 = b.low_diff;
+    high_diff                = b.high_diff;
+    auto_fun_wind_speed      = static_cast<ACFanSpeed>(b.auto_fun_wind_speed);
+    shutdown_after_duration  = b.shutdown_after_duration;
+    shutdown_after_fan_speed = static_cast<ACFanSpeed>(b.shutdown_after_fan_speed);
+}
+
+esp_err_t AirConGlobalConfig::load() {
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+
+    Blob b{};
+    size_t sz = sizeof(b);
+    err = nvs_get_blob(h, KEY, &b, &sz);
+    if (err == ESP_OK && sz == sizeof(b)) {
+        fromBlob(b);
+    } else {
+        // 首次有问题, 把当前默认写入 NVS
+        b = toBlob();
+        err = nvs_set_blob(h, KEY, &b, sizeof(b));
+        if (err == ESP_OK) err = nvs_commit(h);
+    }
+    nvs_close(h);
+    return err;
+}
+
+esp_err_t AirConGlobalConfig::save() {
+    nvs_handle_t h;
+    esp_err_t err = nvs_open(NS, NVS_READWRITE, &h);
+    if (err != ESP_OK) return err;
+    Blob b = toBlob();
+    err = nvs_set_blob(h, KEY, &b, sizeof(b));
+    if (err == ESP_OK) err = nvs_commit(h);
+    nvs_close(h);
+    return err;
 }
