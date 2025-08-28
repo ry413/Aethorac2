@@ -36,12 +36,12 @@ void handle_response(uart_frame_t *frame) {
             uint8_t state = frame->param1;
             
             // 测试模式拦截输入
-            // if (is_test_mode()) {
-            //     uart_frame_t frame;
-            //     build_frame(0x01, 0x00, channel_num, state, 0x00, &frame);
-            //     send_frame(&frame);
-            //     return;
-            // }
+            if (is_test_mode()) {
+                uart_frame_t frame;
+                build_frame(0x01, 0x00, channel_num, state, 0x00, &frame);
+                send_frame(&frame);
+                return;
+            }
 
             static auto& lord = LordManager::instance();
             // 因为配置上可以为一个输入通道配置无限个配置行, 所以一个通道号会对应多个ChannelInput实例

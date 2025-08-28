@@ -9,7 +9,7 @@
     "ESP_ROM_ELF_DIR": "/Users/ry79/.espressif/tools/esp-rom-elfs/20230320/"
   },
   "idf.gitPath": "git",
-  "idf.port": "/dev/tty.usbserial-1130",
+  "idf.port": "/dev/tty.usbserial-1120",
   "idf.flashType": "UART",
   "idf.adapterTargetName": "esp32s3",
   "files.associations": {
