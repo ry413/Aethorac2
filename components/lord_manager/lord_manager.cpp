@@ -35,11 +35,13 @@ void LordManager::registerCurtain(uint16_t did, const std::string& name, const s
 void LordManager::registerIngraredAir(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t airId) {
     auto dev = std::make_unique<InfraredAC>(did, name, carry_state, airId);
     devices_map[dev->getDid()] = std::move(dev);
+    AirConGlobalConfig::getInstance().air_ids.insert(airId);
 }
 
 void LordManager::registerSingleAir(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t airId, uint8_t wc, uint8_t lc, uint8_t mc, uint8_t hc) {
     auto dev = std::make_unique<SinglePipeFCU>(did, name, carry_state, airId, wc, lc, mc, hc);
     devices_map[dev->getDid()] = std::move(dev);
+    AirConGlobalConfig::getInstance().air_ids.insert(airId);
 }
 
 void LordManager::registerRs485(uint16_t did, const std::string& name, const std::string& carry_state, const std::string& code) {
@@ -69,7 +71,7 @@ void LordManager::registerActionGroup(uint16_t aid, const std::string& name, boo
     action_groups_map[actionGroup->getAid()] = std::move(actionGroup);
 }
 
-void LordManager::registerPanelKeyInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t pid, uint8_t bid, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
+void LordManager::registerPanelKeyInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, uint8_t pid, uint8_t bid, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
     // 查找是否已存在面板实例
     auto it = panels_map.find(pid);
     Panel* panel = (it != panels_map.end()) ? it->second.get() : nullptr;
@@ -82,19 +84,19 @@ void LordManager::registerPanelKeyInput(uint16_t iid, const std::string& name, I
     }
 
     // 把button塞给它
-    if (!panel->addButton(iid, name, bid, tag, std::move(action_groups))) {
+    if (!panel->addButton(iid, name, bid, tags, std::move(action_groups))) {
         ESP_LOGW(TAG, "Panel %u 已经有 Button %u, 忽略", pid, bid);
         // 失败的话action_groups就已经丢失了
     }
 }
 
-void LordManager::registerDryContactInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
-    auto input = std::make_unique<ChannelInput>(iid, name, tag, channel, trigger_type, duration, std::move(action_groups));
+void LordManager::registerDryContactInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
+    auto input = std::make_unique<ChannelInput>(iid, name, tags, channel, trigger_type, duration, std::move(action_groups));
     if (trigger_type == TriggerType::INFRARED) {
         input->init_infrared_timer();
     } else {
         // 注册时看看插拔卡输入通道的物理状态
-        if (tag == InputTag::IS_ALIVE_CHANNEL) {
+        if (tags.contains(InputTag::IS_ALIVE_CHANNEL)) {
             if (readDrycontactInputPhysicsState(channel)) {
                 setAlive(true);
                 useAliveHeartBeat();
@@ -106,8 +108,8 @@ void LordManager::registerDryContactInput(uint16_t iid, const std::string& name,
     channel_inputs_map[input->getIid()] = std::move(input);
 }
 
-void LordManager::registerVoiceInput(uint16_t iid, const std::string& name, InputTag tag, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
-    auto input = std::make_unique<VoiceCommand>(iid, name, tag, code, std::move(action_groups));
+void LordManager::registerVoiceInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
+    auto input = std::make_unique<VoiceCommand>(iid, name, tags, code, std::move(action_groups));
     voice_cmds_map[input->getIid()] = std::move(input);
 }
 
@@ -143,7 +145,7 @@ std::vector<ChannelInput*> LordManager::getAllChannelInputByChannelNum(uint8_t c
 
 ChannelInput* LordManager::getAliveChannel() {    
     for (auto& [iid, input] : channel_inputs_map) {
-        if (input->getTag() == InputTag::IS_ALIVE_CHANNEL) {
+        if (input->getTags().contains(InputTag::IS_ALIVE_CHANNEL)) {
             return input.get();
         }
     }
@@ -214,6 +216,16 @@ void LordManager::clearAll() {
     action_groups_map.clear();
     channel_inputs_map.clear();
     panels_map.clear();
+}
+
+void LordManager::setAlive(bool state) {
+    the_rcu_is_alive = state;
+    if (state) {
+        add_state("入住");
+    } else {
+        remove_state("入住");
+    }
+    ESP_LOGI("LORD_MANAGER", "切换至%s状态", the_rcu_is_alive ? "插卡" : "拔卡"); 
 }
 
 bool LordManager::execute_any_key_action_group() {

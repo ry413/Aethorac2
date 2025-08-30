@@ -12,8 +12,8 @@
 
 class PanelButtonInput : public InputBase {
 public:
-    PanelButtonInput(uint16_t iid, const std::string& name, uint8_t pid, int8_t bid, InputTag tag, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
-        : InputBase(iid, InputType::PANEL_BTN, name, tag, std::move(action_groups)), pid(pid), bid(bid) {}
+    PanelButtonInput(uint16_t iid, const std::string& name, uint8_t pid, int8_t bid, std::set<InputTag> tags, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
+        : InputBase(iid, InputType::PANEL_BTN, name, tags, std::move(action_groups)), pid(pid), bid(bid) {}
 
     void execute() override;
     uint8_t getBid() const { return bid; }
@@ -38,8 +38,8 @@ public:
         }
     }
     
-    bool addButton(uint16_t iid, const std::string& name, uint8_t bid, InputTag tag, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
-        auto btn = std::make_unique<PanelButtonInput>(iid, name, pid, bid, tag, std::move(action_groups));
+    bool addButton(uint16_t iid, const std::string& name, uint8_t bid, std::set<InputTag> tags, std::vector<std::unique_ptr<ActionGroup>>&& action_groups) {
+        auto btn = std::make_unique<PanelButtonInput>(iid, name, pid, bid, tags, std::move(action_groups));
         auto [it, ok] = buttons_map.try_emplace(bid, std::move(btn));
         return ok;
     }

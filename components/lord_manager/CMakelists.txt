@@ -2,7 +2,7 @@ idf_component_register(
     SRCS "lord_manager.cpp"
     INCLUDE_DIRS "."
     REQUIRES enums action_group stm32_comm
-    iinput channel_input panel_input voice_command
+    iinput channel_input panel_input voice_command room_state
     idevice preset_device lamp curtain air_conditioner rs485_command relay_out drycontact_out
     esp_timer
 )

@@ -19,8 +19,9 @@
 #define SWITCH_WRITE        0x01        // 控制按钮
 
 #define AIR_CON             0x16        // 设备类型: 空调
-#define AIR_CON_INQUIRE     0xA2        // 空调查询
+#define AIR_CON_INQUIRE_XZ  0xA2        // 逼迫温控器上报状态(XZ的)
 #define AIR_CON_CONTROL     0xA1        // 空调控制
+#define AIR_CON_INQUERE     0xA0        // 空调查询(逼迫温控器上报状态)
 #define AIR_CON_REPORT      0x08        // 空调响应
 #define INFRARED_CONTEROLLER 0x77       // 红外控制器, 就是空调遥控
 

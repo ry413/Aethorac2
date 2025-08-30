@@ -27,8 +27,9 @@ void ChannelInput::execute() {
         }
     }
     
-    // 虽然不知道不知道为什么ChannelInput会有这个, 但同样可以实现
-    if (tag != InputTag::IGNORE_ANY_KEY_EXECUTE && lord.execute_any_key_action_group()) {
+    // 干接点同样可以忽略任意键执行
+    // 如果有"无视任意键"的tag就跳过
+    if (!tags.contains(InputTag::IGNORE_ANY_KEY_EXECUTE) && lord.execute_any_key_action_group()) {
         printf("已调用任意键执行动作组, 返回\n");
     } else if (current_index < action_groups.size()) {
         action_groups[current_index]->executeAllAtomicAction();
@@ -45,7 +46,7 @@ void ChannelInput::uncertain_timer_callback(TimerHandle_t xTimer) {
         ESP_LOGI(TAG, "定时器超时, 它确认无人, 试图执行超时逻辑\n");
 
         // 检查现在是不是想拔卡(红外操作插拔卡)
-        if (this->tag == InputTag::IS_ALIVE_CHANNEL) {
+        if (this->tags.contains(InputTag::IS_ALIVE_CHANNEL)) {
             ESP_LOGI(TAG, "试图执行的是拔卡, 进行判断");
             bool door_event_after_last_presence =
                 (lord.last_door_open_time  > lord.last_presence_time) &&   // 门确实在“最后有人”之后打开过

@@ -316,7 +316,18 @@ void parseLocalLogicConfig(void) {
             const char* name = json_get_str_safe(input_obj, "n", "");
             uint16_t iid = json_get_int_safe(input_obj, "iid", -1);
             InputType itype = static_cast<InputType>(json_get_int_safe(input_obj, "type", (int)InputType::NONE));
-            InputTag tag = static_cast<InputTag>(json_get_int_safe(input_obj, "tg", (int)InputTag::NONE));
+            // InputTag tag = static_cast<InputTag>(json_get_int_safe(input_obj, "tg", (int)InputTag::NONE));
+            std::set<InputTag> tags_set;
+            if (yyjson_val* tgs_arr = yyjson_obj_get(input_obj, "tgs"); yyjson_is_arr(tgs_arr)) {
+                size_t idx1, max1;
+                yyjson_val* item1;
+                yyjson_arr_foreach(tgs_arr, idx1, max1, item1) {
+                    if (item1 && yyjson_is_int(item1)) {
+                        tags_set.insert(static_cast<InputTag>(yyjson_get_int(item1)));
+                    }
+                }
+            }
+            
             std::vector<std::unique_ptr<ActionGroup>> action_groups;
             if (yyjson_val* ag_arr = yyjson_obj_get(input_obj, "a"); yyjson_is_arr(ag_arr)) {
                 size_t idx1, max1;
@@ -387,9 +398,9 @@ void parseLocalLogicConfig(void) {
                         }
                     }
                 }
-                ESP_LOGI(TAG, "注册按键, iid(%u), nm(%s), pid(%u), bid(%u), tag(%d), g_size(%u)",
-                                        iid, name, pid, bid, (int)tag, action_groups.size());
-                lord.registerPanelKeyInput(iid, name, tag, pid, bid, std::move(action_groups));
+                ESP_LOGI(TAG, "注册按键, iid(%u), nm(%s), pid(%u), bid(%u), tags_size(%d), g_size(%u)",
+                                        iid, name, pid, bid, tags_set.size(), action_groups.size());
+                lord.registerPanelKeyInput(iid, name, tags_set, pid, bid, std::move(action_groups));
             } else if (itype == InputType::DRY_CONTACT) {
                 uint8_t channel = json_get_int_safe(input_obj, "ch");
                 TriggerType tt = static_cast<TriggerType>(json_get_int_safe(input_obj, "tt", (int)TriggerType::NONE));
@@ -398,14 +409,14 @@ void parseLocalLogicConfig(void) {
                     duration = json_get_int_safe(input_obj, "du", 1);
                 }
 
-                ESP_LOGI(TAG, "注册干接点输入, iid(%d), tp(%d), nm(%s), ch(%d), tt(%d), tag(%d), g_size(%d), du(%lld)",
-                        iid, (int)itype, name, channel, (int)tt, (int)tag, action_groups.size(), duration);
-                lord.registerDryContactInput(iid, name, tag, channel, tt, duration, std::move(action_groups));
+                ESP_LOGI(TAG, "注册干接点输入, iid(%d), tp(%d), nm(%s), ch(%d), tt(%d), tags_size(%d), g_size(%d), du(%lld)",
+                        iid, (int)itype, name, channel, (int)tt, tags_set.size(), action_groups.size(), duration);
+                lord.registerDryContactInput(iid, name, tags_set, channel, tt, duration, std::move(action_groups));
             } else if (itype == InputType::VOICE_CMD) {
                 const char* code = json_get_str_safe(input_obj, "cd");
-                ESP_LOGI(TAG, "注册语音指令输入, iid(%d), tp(%d), nm(%s), code(%s), tag(%d), g_size(%d)",
-                        iid, (int)itype, name, code, (int)tag, action_groups.size());
-                lord.registerVoiceInput(iid, name, tag, code, std::move(action_groups));
+                ESP_LOGI(TAG, "注册语音指令输入, iid(%d), tp(%d), nm(%s), code(%s), tags_size(%d), g_size(%d)",
+                        iid, (int)itype, name, code, tags_set.size(), action_groups.size());
+                lord.registerVoiceInput(iid, name, tags_set, code, std::move(action_groups));
             }
         }
     } else {
@@ -414,7 +425,7 @@ void parseLocalLogicConfig(void) {
     yyjson_doc_free(inputs_config_doc);
     ESP_LOGI(TAG, "================ 配置解析完成 ================");
     IndicatorHolder::getInstance().callAllAndClear();               // 同步指示灯
-    generate_response(AIR_CON, AIR_CON_INQUIRE, 0x00, 0x00, 0x00);  // 逼迫温控器上报状态
+    generate_response(AIR_CON, AIR_CON_INQUIRE_XZ, 0x00, 0x00, 0x00);  // 逼迫温控器上报状态
 
     printCurrentFreeMemory();
 }

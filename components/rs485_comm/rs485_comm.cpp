@@ -73,6 +73,35 @@ void uart_init_rs485() {
         }
     }, "495ALIVE task", 2048, NULL, 3, NULL);
 
+    // 空调查询任务
+    xTaskCreate([](void* param) {
+        auto& ids = AirConGlobalConfig::getInstance().air_ids;
+
+        auto it = ids.begin();
+        while (true) {
+            // 若集合为空, 只是等待后重试, 这样可以支持热修改配置时加的空调
+            if (ids.empty()) {
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                it = ids.begin();
+                continue;
+            }
+
+            // 迭代器跑到末尾就回到开头, 实现循环
+            if (it == ids.end()) {
+                it = ids.begin();
+            }
+
+            // 再检查一次
+            if (it != ids.end()) {
+                uint8_t id = *it;
+                generate_response(AIR_CON, AIR_CON_INQUERE, 0x00, id, 0x00);
+                ++it; // 指向下一个, 下一轮 2000ms 再发
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(2000));
+        }
+    }, "AirIDs_poll_task", 2048, nullptr, 3, nullptr);
+
     // 最终发送队列中的485指令的任务
     xTaskCreate([](void* param) {
         rs485_bus_cmd cmd;
@@ -397,6 +426,7 @@ void handle_rs485_data(uint8_t* data, int length) {
                 }
             case 0x0A:  // 查固件版本
                 if (is_test_mode()) {
+                    // TODO ??
                     uint8_t maj = 0, min = 0, pat = 0;
                     generate_response(ORACLE, 0x0A, maj, min, pat);
                     break;

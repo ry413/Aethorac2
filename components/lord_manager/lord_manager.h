@@ -13,6 +13,7 @@
 #include "panel_input.h"
 #include "voice_command.h"
 #include "esp_timer.h"
+#include "room_state.h"
 
 static std::array<uint8_t, 8> alive_heartbeat_code = {0x7F, 0xC0, 0xFF, 0xFF, 0x00, 0x80, 0xBD, 0x7E};
 static std::array<uint8_t, 8> sleep_heartbeat_code = {0x7F, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x3D, 0x7E};
@@ -40,9 +41,9 @@ public:
     void registerDoorbell(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel);
     void registerActionGroup(uint16_t aid, const std::string& name, bool is_mode, std::vector<AtomicAction> actions);
 
-    void registerPanelKeyInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t pid, uint8_t bid, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
-    void registerDryContactInput(uint16_t iid, const std::string& name, InputTag tag, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
-    void registerVoiceInput(uint16_t iid, const std::string& name, InputTag tag, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
+    void registerPanelKeyInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, uint8_t pid, uint8_t bid, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
+    void registerDryContactInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, uint8_t channel, TriggerType trigger_type, uint64_t duration, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
+    void registerVoiceInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
 
     // ================ 获取注册表里的某些东西 ================
     IDevice* getDeviceByDid(uint16_t did);
@@ -97,7 +98,7 @@ public:
     
     // ================ 其实是杂项 ================
     inline bool getAlive() const { return the_rcu_is_alive; }
-    inline void setAlive(bool state) { the_rcu_is_alive = state; ESP_LOGI("LORD_MANAGER", "切换至%s状态", the_rcu_is_alive ? "插卡" : "拔卡"); }
+    void setAlive(bool state);
     inline bool isSleep() const { return heartbeat_code == sleep_heartbeat_code; }
     const std::string& getLastModeName() const { return last_mode_name; }
 

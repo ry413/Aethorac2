@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <atomic>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -62,6 +63,8 @@ public:
 
     esp_err_t load();
     esp_err_t save();
+
+    std::set<uint8_t> air_ids;                                  // 所有存在的空调ID
 
 private:
     AirConGlobalConfig() = default;

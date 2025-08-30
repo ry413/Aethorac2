@@ -52,14 +52,14 @@ void handle_response(uart_frame_t *frame) {
             }
 
             // 检测此通道是否能在拔卡时使用
-            InputTag tag = channel_input_ptrs.front()->getTag();
-            if (!lord.getAlive() && tag == InputTag::NONE) {
+            std::set<InputTag> tags = channel_input_ptrs.front()->getTags();
+            if (!lord.getAlive() && !tags.contains(InputTag::REMOVE_CARD_USABLE)) {
                 ESP_LOGI(TAG, "输入[%d], 在拔卡时拒绝响应", channel_num);
                 return;
             }
 
             // 是门磁的话就更新门状态
-            if (tag == InputTag::IS_DOOR_CHANNEL) {
+            if (tags.contains(InputTag::IS_DOOR_CHANNEL)) {
                 if (state) {
                     lord.onDoorClosed();
                 } else {
@@ -77,7 +77,7 @@ void handle_response(uart_frame_t *frame) {
                 }
             }
             // 是门铃的话要判断处不处于勿扰状态
-            else if (tag == InputTag::IS_DOORBELL_CHANNEL) {
+            else if (tags.contains(InputTag::IS_DOORBELL_CHANNEL)) {
                 if (exist_state("勿扰")) {
                     return;
                 }

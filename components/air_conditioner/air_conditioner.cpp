@@ -371,7 +371,7 @@ void SinglePipeFCU::stop_on_reached_target() {
 void AirConBase::power_off() {
     is_work.store(false);
     is_running.store(false);
-    ESP_LOGI(TAG, "空调%d已关闭", ac_id);
+    // ESP_LOGI(TAG, "空调%d已关闭", ac_id);
 }
 
 void InfraredAC::execute(std::string operation, std::string parameter, ActionGroup* self_action_group, bool should_log) {

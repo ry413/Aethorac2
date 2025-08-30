@@ -9,8 +9,8 @@
 
 class VoiceCommand : public InputBase {
 public:
-    VoiceCommand(uint16_t iid, const std::string& name, InputTag tag, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
-        : InputBase(iid, InputType::VOICE_CMD, name, tag, std::move(action_groups)) {
+    VoiceCommand(uint16_t iid, const std::string& name, std::set<InputTag> tags, const std::string& code, std::vector<std::unique_ptr<ActionGroup>>&& action_groups)
+        : InputBase(iid, InputType::VOICE_CMD, name, tags, std::move(action_groups)) {
             this->code = pavectorseHexToFixedArray(code);
         }
 

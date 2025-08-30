@@ -13,7 +13,9 @@
 #include "my_mqtt.h"
 
 #define TAG "PRESET_DEVICE"
+static bool have_spanshot = false;                                  // 是否有可用的快照
 std::unordered_map<uint16_t, bool> all_device_onoff_snapshot = {};  // <did, isOn> 房间设备快照
+static bool room_alive_snapshot = false;                            // 此快照里的房间是否为插卡状态
 
 void PresetDevice::execute(std::string operation, std::string parameter, ActionGroup* self_action_group, bool should_log) {
     ESP_LOGI_CYAN(TAG, "[%s]收到操作[%s], par[%s], aid[%d]", name.c_str(), operation.c_str(), parameter.c_str(), self_action_group ? self_action_group->getAid() : -1);
@@ -117,6 +119,7 @@ void PresetDevice::execute(std::string operation, std::string parameter, ActionG
         }
         case DeviceType::SNAPSHOT: {
             if (operation == "记录快照") {
+                all_device_onoff_snapshot.clear();
                 for(auto* dev : lord.getDevicesByType<IDevice>()) {
                     // 跳过预设设备
                     if (dynamic_cast<PresetDevice*>(dev) != nullptr) {
@@ -124,39 +127,67 @@ void PresetDevice::execute(std::string operation, std::string parameter, ActionG
                     }
                     all_device_onoff_snapshot[dev->getDid()] = dev->isOn();
                 }
+                room_alive_snapshot = lord.getAlive();
+                have_spanshot = true;
             } else if (operation == "读取并删除快照") {
-                for (auto [did, is_on] : all_device_onoff_snapshot) {
-                    if (IDevice* dev = lord.getDeviceByDid(did)) {
-                        auto type = dev->getType();
-                        switch (type) {
-                            case DeviceType::LAMP:
-                            case DeviceType::CURTAIN:
-                            case DeviceType::INFRARED_AIR:
-                            case DeviceType::SINGLE_AIR:
-                            case DeviceType::DRY_CONTACT:
-                                dev->execute(is_on ? "开" : "关", "");
-                                break;
-                            case DeviceType::RELAY:
-                                if (auto* relay = dynamic_cast<SingleRelayDevice*>(dev)) {
-                                    if (relay->getType() != DeviceType::DOORBELL) {
-                                        relay->execute(is_on ? "开" : "关", "");
+                if (have_spanshot) {
+                    for (auto [did, is_on] : all_device_onoff_snapshot) {
+                        if (IDevice* dev = lord.getDeviceByDid(did)) {
+                            auto type = dev->getType();
+                            switch (type) {
+                                case DeviceType::LAMP:
+                                case DeviceType::CURTAIN:
+                                case DeviceType::INFRARED_AIR:
+                                case DeviceType::SINGLE_AIR:
+                                case DeviceType::DRY_CONTACT:
+                                    dev->execute(is_on ? "开" : "关", "");
+                                    break;
+                                case DeviceType::RELAY:
+                                    if (auto* relay = dynamic_cast<SingleRelayDevice*>(dev)) {
+                                        if (relay->getType() != DeviceType::DOORBELL) {
+                                            relay->execute(is_on ? "开" : "关", "");
+                                        }
                                     }
-                                }
-                                break;
-                            default:
-                                break;
+                                    break;
+                                default:
+                                    break;
+                            }
                         }
                     }
-                }
-                all_device_onoff_snapshot.clear();
-            } else if (operation == "删除快照") {
-                all_device_onoff_snapshot.clear();
-            } else if (operation == "清除快照并跳出") {
-                all_device_onoff_snapshot.clear();
-                if (self_action_group) {
-                    self_action_group->suicide();
+                    all_device_onoff_snapshot.clear();
+                    if (room_alive_snapshot) {
+                        lord.useAliveHeartBeat();
+                        lord.setAlive(true);
+                    } else {
+                        ESP_LOGE(TAG, "恢复快照时room_alive_snapshot不应该是拔卡");
+                    }
+                    room_alive_snapshot = false;
+                    have_spanshot = false;
                 } else {
-                    ESP_LOGE(TAG, "不存在的self_action_group");
+                    ESP_LOGI(TAG, "没有快照可恢复");
+                }
+            } else if (operation == "删除快照") {
+                if (have_spanshot) {
+                    ESP_LOGI(TAG, "删除快照");
+                    all_device_onoff_snapshot.clear();
+                    room_alive_snapshot = false;
+                    have_spanshot = false;
+                } else {
+                    ESP_LOGI(TAG, "没有快照可删除");
+                }
+            } else if (operation == "清除快照并跳出") {
+                if (have_spanshot) {
+                    ESP_LOGI(TAG, "清除快照并跳出");
+                    all_device_onoff_snapshot.clear();
+                    room_alive_snapshot = false;
+                    have_spanshot = false;
+                    if (self_action_group) {
+                        self_action_group->suicide();
+                    } else {
+                        ESP_LOGE(TAG, "不存在的self_action_group");
+                    }
+                } else {
+                    ESP_LOGI(TAG, "没有快照可删除");
                 }
             }
             break;
