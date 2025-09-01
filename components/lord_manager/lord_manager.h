@@ -95,6 +95,12 @@ public:
     uint64_t last_door_open_time = 0;   // 最近一次门被打开的时刻
     uint64_t last_door_close_time = 0;  // 最近一次门被关上的时刻
     bool door_open = false;
+
+    bool useDayNight = false;           // 是否启用昼夜模式, 影响红外时长是否翻倍
+    int dayTimeStart = 7;               // 昼间开始时间, 小时
+    int nightTimeStart = 19;            // 夜间开始时间, 小时
+
+    bool ignoreInfrared = false;        // 现在是否忽略红外输入
     
     // ================ 其实是杂项 ================
     inline bool getAlive() const { return the_rcu_is_alive; }

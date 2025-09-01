@@ -19,6 +19,9 @@
 #include "air_conditioner.h"
 #include <rs485_comm.h>
 #include "yyjson.h"
+#include <stm32_comm_types.h>
+#include <stm32_tx.h>
+#include "stm32_rx.h"
 #define TAG "JSON_CODEC"
 
 using json = nlohmann::json;
@@ -109,6 +112,9 @@ void parseLocalLogicConfig(void) {
     yyjson_val* common_config_root = yyjson_doc_get_root(common_config_doc);
     printCurrentFreeMemory();
     if (yyjson_val* common_config_obj = yyjson_obj_get(common_config_root, "c"); yyjson_is_obj(common_config_obj)) {
+        lord.useDayNight = json_get_bool_safe(common_config_obj, "useDayNight");
+        lord.dayTimeStart = json_get_int_safe(common_config_obj, "dayTimeStart", 7);
+        lord.nightTimeStart = json_get_int_safe(common_config_obj, "nightTimeStart", 19);
         // if (yyjson_val* air_config_obj = yyjson_obj_get(common_config_obj, "airConfig")) {
         //     auto& air_config = AirConGlobalConfig::getInstance();
         //     air_config.default_target_temp = json_get_int_safe(air_config_obj, "defaultTargetTemp", 26);
@@ -427,6 +433,36 @@ void parseLocalLogicConfig(void) {
     IndicatorHolder::getInstance().callAllAndClear();               // 同步指示灯
     generate_response(AIR_CON, AIR_CON_INQUIRE_XZ, 0x00, 0x00, 0x00);  // 逼迫温控器上报状态
 
+    // 断电后上电, 来一次插卡
+    xTaskCreate([] (void* param) {
+        vTaskDelay(pdMS_TO_TICKS(3000));
+        auto& lord = LordManager::instance();
+        auto* alive_channel = lord.getAliveChannel();
+        if (alive_channel && (alive_channel->trigger_type == TriggerType::INFRARED)) {
+                uart_frame_t wakeup_infrared_cmd;
+                // 直接执行动作组, 模拟红外失效, 开门, 关门
+                alive_channel->execute();
+
+                build_frame(0x07, 0x00, alive_channel->channel, 0x00, 0x00, &wakeup_infrared_cmd);
+                handle_response(&wakeup_infrared_cmd);
+                vTaskDelay(pdMS_TO_TICKS(500));
+
+                lord.onDoorOpened();
+                vTaskDelay(pdMS_TO_TICKS(500));
+
+                lord.onDoorClosed();
+        } else {            
+            if (lord.readDrycontactInputPhysicsState(lord.getAliveChannel()->channel)) {
+                lord.setAlive(true);
+                lord.useAliveHeartBeat();
+            } else {
+                
+            }
+        }
+        vTaskDelete(nullptr);
+    }, "InitAliveChannel", 4096, nullptr, 5, nullptr);
+
+    
     printCurrentFreeMemory();
 }
 

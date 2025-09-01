@@ -8,6 +8,8 @@
 #include "idevice.h"
 #include "enums.h"
 
+enum class CurtainState { CLOSED, OPEN, OPENING, CLOSING, STOPPED };
+
 class Curtain : public IDevice {
 public:
     Curtain(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t open_ch, uint8_t close_ch, uint64_t runtime)
@@ -27,6 +29,7 @@ public:
 
     void addOpenAssBtn(PanelButtonPair pair) { open_buttons.push_back(pair); }
     void addCloseAssBtn(PanelButtonPair pair) { close_buttons.push_back(pair); }
+    CurtainState getState() const { return state; }
 
 private:
     uint8_t open_channel;
@@ -34,8 +37,7 @@ private:
     uint64_t runtime;
 
     // 情况1.两个按键分别开与关
-    enum class State { CLOSED, OPEN, OPENING, CLOSING, STOPPED };
-    State state = State::CLOSED;
+    CurtainState state = CurtainState::CLOSED;
     std::vector<PanelButtonPair> open_buttons;
     std::vector<PanelButtonPair> close_buttons;
     
@@ -58,7 +60,7 @@ private:
     // void handleReverseAction();
 
     // 打开操作对应的继电器
-    void startAction(uint8_t channel, State newState, std::vector<PanelButtonPair> action_buttons);
+    void startAction(uint8_t channel, CurtainState newState, std::vector<PanelButtonPair> action_buttons);
 
     // 停止此时的动作的继电器
     void stopCurrentAction();

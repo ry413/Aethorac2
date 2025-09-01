@@ -426,9 +426,7 @@ void handle_rs485_data(uint8_t* data, int length) {
                 }
             case 0x0A:  // 查固件版本
                 if (is_test_mode()) {
-                    // TODO ??
-                    uint8_t maj = 0, min = 0, pat = 0;
-                    generate_response(ORACLE, 0x0A, maj, min, pat);
+                    generate_response(ORACLE, 0x0A, AETHORAC_VERSION_MAJOR, AETHORAC_VERSION_MINOR, AETHORAC_VERSION_PATCH);
                     break;
                 }
             case 0x0B:  // 开关stm32的RX/TX打印

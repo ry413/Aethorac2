@@ -59,8 +59,9 @@ void ChannelInput::uncertain_timer_callback(TimerHandle_t xTimer) {
             // 1
             if (lord.door_open) {           // 门仍开着，当然不能拔
                 ESP_LOGI(TAG, "门还开着，不拔卡, 重置红外倒计时");  // 人出去后, 却还长时间开着门的情况
-                xTimerStop(uncertain_timer, 0);
-                xTimerStart(uncertain_timer, 0);
+                // xTimerStop(uncertain_timer, 0);
+                // xTimerStart(uncertain_timer, 0);
+                arm_uncertain_timer();
                 return;
             }
             // 2
@@ -74,8 +75,9 @@ void ChannelInput::uncertain_timer_callback(TimerHandle_t xTimer) {
             uint64_t idle_ms = now_ms - lord.last_action_group_time;
             if (idle_ms < 10000) {
                 ESP_LOGI(TAG, "最近执行过动作, 不拔卡");
-                xTimerStop(uncertain_timer, 0);
-                xTimerStart(uncertain_timer, 0);
+                // xTimerStop(uncertain_timer, 0);
+                // xTimerStart(uncertain_timer, 0);
+                arm_uncertain_timer();
                 return;
             }
 
@@ -120,8 +122,9 @@ void ChannelInput::execute_infrared(uint8_t state) {
             } else if (state == 0x00) {
                 ESP_LOGI(TAG, "IDLE时收到无人判断, 重置定时器");    // 估计属于纯调试状况, 实际不会发生
                 currentState = SENSOR_UNCERTAIN;
-                xTimerStop(uncertain_timer, 0);
-                xTimerStart(uncertain_timer, 0);
+                // xTimerStop(uncertain_timer, 0);
+                // xTimerStart(uncertain_timer, 0);
+                arm_uncertain_timer();
             }
             break;
 
@@ -130,10 +133,12 @@ void ChannelInput::execute_infrared(uint8_t state) {
                 currentState = SENSOR_UNCERTAIN;
                 ESP_LOGI(TAG, "检测到不确定状态, 启动定时器\n");
                 // 先停止一下，防止之前残留的情况
-                xTimerStop(uncertain_timer, 0);
+                // xTimerStop(uncertain_timer, 0);
 
                 // 启动一次性定时器
-                xTimerStart(uncertain_timer, 0);
+                // xTimerStart(uncertain_timer, 0);
+
+                arm_uncertain_timer();
             }
             break;
 
@@ -154,10 +159,38 @@ void ChannelInput::init_infrared_timer() {
     if (!uncertain_timer) {
         uncertain_timer = xTimerCreate(
             "uncertainTimer",
-            pdMS_TO_TICKS(duration * 1000),
+            1, // 初始值无所谓, 之后会被重设
             pdFALSE,
             this,
             static_uncertain_timer_callback
         );
     }
+}
+
+
+static inline bool is_daytime_now(time_t now, int dayStart, int nightStart) {
+    struct tm lt; localtime_r(&now, &lt);
+    int h = lt.tm_hour;
+    if (dayStart < nightStart) return h >= dayStart && h < nightStart;
+    return h >= dayStart || h < nightStart; // 跨零点
+}
+
+// 夜间把 duration(秒) x2 -> Tick
+TickType_t ChannelInput::calc_uncertain_ticks() const {
+    static auto& lord = LordManager::instance();
+    time_t now = get_current_timestamp();
+    if (now == 0)  {
+        ESP_LOGI(TAG, "无法获取时间, 红外计时一倍");
+        return pdMS_TO_TICKS(duration * 1000u);
+    }
+    bool day = is_daytime_now(now, lord.dayTimeStart, lord.nightTimeStart);
+    ESP_LOGI(TAG, "现在是[%s]", day ? "白天" : "夜晚");
+    uint32_t ms = duration * 1000u * (day ? 1u : 2u);
+    return pdMS_TO_TICKS(ms);
+}
+
+// 统一"按当前昼/夜重装一次性定时器"的入口
+void ChannelInput::arm_uncertain_timer() {
+    // xTimerChangePeriod不论已启动与否，都会把到期时间重置为"从现在起新周期"
+    xTimerChangePeriod(uncertain_timer, calc_uncertain_ticks(), 0);
 }

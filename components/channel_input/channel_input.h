@@ -42,4 +42,6 @@ private:
     static void static_uncertain_timer_callback(TimerHandle_t xTimer);
     void uncertain_timer_callback(TimerHandle_t xTimer);
 
+    TickType_t calc_uncertain_ticks() const;
+    void arm_uncertain_timer();
 };

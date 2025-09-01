@@ -8,6 +8,7 @@
 #include "room_state.h"
 #include "lord_manager.h"
 #include "stm32_tx.h"
+#include <curtain.h>
 
 #define TAG "STM32_RX"
 
@@ -97,7 +98,19 @@ void handle_response(uart_frame_t *frame) {
                         channel_input_ptr->execute();
                     }
                 } else if (channel_input_ptr->trigger_type == TriggerType::INFRARED) {
-                    channel_input_ptr->execute_infrared(state);
+                    bool ignore = false;
+                    for (auto* curtain : lord.getDevicesByType<Curtain>()) {
+                        auto curtainState = curtain->getState();
+                        if (curtainState == CurtainState::OPENING || curtainState == CurtainState::CLOSING) {
+                            ignore = true;
+                            break;
+                        }
+                    }
+                    if (ignore) {
+                        ESP_LOGI(TAG, "窗帘正在动作, 忽略红外");
+                    } else {
+                        channel_input_ptr->execute_infrared(state);
+                    }
                 }
             }
             break;

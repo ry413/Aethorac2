@@ -12,6 +12,7 @@
 #include "rs485_command.h"
 #include "relay_out.h"
 #include "drycontact_out.h"
+#include <stm32_rx.h>
 
 #define TAG "LORD_MANAGER"
 
@@ -94,16 +95,6 @@ void LordManager::registerDryContactInput(uint16_t iid, const std::string& name,
     auto input = std::make_unique<ChannelInput>(iid, name, tags, channel, trigger_type, duration, std::move(action_groups));
     if (trigger_type == TriggerType::INFRARED) {
         input->init_infrared_timer();
-    } else {
-        // 注册时看看插拔卡输入通道的物理状态
-        if (tags.contains(InputTag::IS_ALIVE_CHANNEL)) {
-            if (readDrycontactInputPhysicsState(channel)) {
-                setAlive(true);
-                useAliveHeartBeat();
-            } else {
-
-            }
-        }
     }
     channel_inputs_map[input->getIid()] = std::move(input);
 }
@@ -145,7 +136,7 @@ std::vector<ChannelInput*> LordManager::getAllChannelInputByChannelNum(uint8_t c
 
 ChannelInput* LordManager::getAliveChannel() {    
     for (auto& [iid, input] : channel_inputs_map) {
-        if (input->getTags().contains(InputTag::IS_ALIVE_CHANNEL)) {
+        if (input->getTags().contains(InputTag::IS_ALIVE_CHANNEL) && input->trigger_type != TriggerType::INFRARED_TIMEOUT) {
             return input.get();
         }
     }
