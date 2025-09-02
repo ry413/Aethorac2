@@ -97,8 +97,8 @@ public:
     bool door_open = false;
 
     bool useDayNight = false;           // 是否启用昼夜模式, 影响红外时长是否翻倍
-    int dayTimeStart = 7;               // 昼间开始时间, 小时
-    int nightTimeStart = 19;            // 夜间开始时间, 小时
+    int dayTimePoint = 7;               // 昼间开始时间, 小时
+    int nightTimePoint = 19;            // 夜间开始时间, 小时
 
     bool ignoreInfrared = false;        // 现在是否忽略红外输入
     

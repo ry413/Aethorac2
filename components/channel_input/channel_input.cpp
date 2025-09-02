@@ -171,6 +171,7 @@ void ChannelInput::init_infrared_timer() {
 static inline bool is_daytime_now(time_t now, int dayStart, int nightStart) {
     struct tm lt; localtime_r(&now, &lt);
     int h = lt.tm_hour;
+    // ESP_LOGI(TAG, "现在是%d点", h);
     if (dayStart < nightStart) return h >= dayStart && h < nightStart;
     return h >= dayStart || h < nightStart; // 跨零点
 }
@@ -178,13 +179,19 @@ static inline bool is_daytime_now(time_t now, int dayStart, int nightStart) {
 // 夜间把 duration(秒) x2 -> Tick
 TickType_t ChannelInput::calc_uncertain_ticks() const {
     static auto& lord = LordManager::instance();
+    // ESP_LOGI(TAG, "%d", lord.useDayNight);
+    if (!lord.useDayNight) {
+        return pdMS_TO_TICKS(duration * 1000u);
+    }
+
     time_t now = get_current_timestamp();
     if (now == 0)  {
         ESP_LOGI(TAG, "无法获取时间, 红外计时一倍");
         return pdMS_TO_TICKS(duration * 1000u);
     }
-    bool day = is_daytime_now(now, lord.dayTimeStart, lord.nightTimeStart);
-    ESP_LOGI(TAG, "现在是[%s]", day ? "白天" : "夜晚");
+    bool day = is_daytime_now(now, lord.dayTimePoint, lord.nightTimePoint);
+    // ESP_LOGI(TAG, "d/n: %d %d", lord.dayTimePoint, lord.nightTimePoint);
+    // ESP_LOGI(TAG, "现在是[%s]", day ? "白天" : "夜晚");
     uint32_t ms = duration * 1000u * (day ? 1u : 2u);
     return pdMS_TO_TICKS(ms);
 }

@@ -113,8 +113,8 @@ void parseLocalLogicConfig(void) {
     printCurrentFreeMemory();
     if (yyjson_val* common_config_obj = yyjson_obj_get(common_config_root, "c"); yyjson_is_obj(common_config_obj)) {
         lord.useDayNight = json_get_bool_safe(common_config_obj, "useDayNight");
-        lord.dayTimeStart = json_get_int_safe(common_config_obj, "dayTimeStart", 7);
-        lord.nightTimeStart = json_get_int_safe(common_config_obj, "nightTimeStart", 19);
+        lord.dayTimePoint = json_get_int_safe(common_config_obj, "dayTimePoint", 7);
+        lord.nightTimePoint = json_get_int_safe(common_config_obj, "nightTimePoint", 19);
         // if (yyjson_val* air_config_obj = yyjson_obj_get(common_config_obj, "airConfig")) {
         //     auto& air_config = AirConGlobalConfig::getInstance();
         //     air_config.default_target_temp = json_get_int_safe(air_config_obj, "defaultTargetTemp", 26);
@@ -438,25 +438,27 @@ void parseLocalLogicConfig(void) {
         vTaskDelay(pdMS_TO_TICKS(3000));
         auto& lord = LordManager::instance();
         auto* alive_channel = lord.getAliveChannel();
-        if (alive_channel && (alive_channel->trigger_type == TriggerType::INFRARED)) {
+        if (alive_channel) {
+            // 插拔卡通道是红外, 直接试图模拟一次插拔卡
+            if (alive_channel->trigger_type == TriggerType::INFRARED) {
+
                 uart_frame_t wakeup_infrared_cmd;
                 // 直接执行动作组, 模拟红外失效, 开门, 关门
                 alive_channel->execute();
-
+                
                 build_frame(0x07, 0x00, alive_channel->channel, 0x00, 0x00, &wakeup_infrared_cmd);
                 handle_response(&wakeup_infrared_cmd);
                 vTaskDelay(pdMS_TO_TICKS(500));
-
+                
                 lord.onDoorOpened();
                 vTaskDelay(pdMS_TO_TICKS(500));
-
+                
                 lord.onDoorClosed();
-        } else {            
-            if (lord.readDrycontactInputPhysicsState(lord.getAliveChannel()->channel)) {
+            }
+            // 如果是普通干接点输入, 就根据干接点输入物理状态决定是不是恢复为插卡状态
+            else if (lord.readDrycontactInputPhysicsState(lord.getAliveChannel()->channel)) {
                 lord.setAlive(true);
                 lord.useAliveHeartBeat();
-            } else {
-                
             }
         }
         vTaskDelete(nullptr);
