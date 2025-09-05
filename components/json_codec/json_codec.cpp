@@ -246,6 +246,12 @@ void parseLocalLogicConfig(void) {
                     lord.registerRelayOut(did, name, carry_state, ch, link_dids, repel_dids);
                     break;
                 }
+                case DeviceType::BGM: {
+                    ESP_LOGI(TAG, "注册背景音乐, did(%u), nm(%s), st(%s)",
+                                               did, name, carry_state);
+                    lord.registerBGM(did, name, carry_state);
+                    break;
+                }
                 case DeviceType::HEARTBEAT:
                 case DeviceType::ROOM_STATE:
                 case DeviceType::DELAYER:
@@ -397,6 +403,11 @@ void parseLocalLogicConfig(void) {
                         } else if (dev_type == DeviceType::DRY_CONTACT) {
                             if (DryContactOut* dry = dynamic_cast<DryContactOut*>(dev)) {
                                 dry->addAssBtn(PanelButtonPair({pid, bid}));
+                                ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
+                            }
+                        } else if (dev_type == DeviceType::BGM) {
+                            if (BGM* bgm = dynamic_cast<BGM*>(dev)) {
+                                bgm->addAssBtn(PanelButtonPair({pid, bid}));
                                 ESP_LOGI(TAG, "绑定%u,%u至%s(%u)", pid, bid, dev->getName().c_str(), dev->getDid());
                             }
                         } else {

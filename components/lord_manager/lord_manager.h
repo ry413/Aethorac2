@@ -14,6 +14,7 @@
 #include "voice_command.h"
 #include "esp_timer.h"
 #include "room_state.h"
+#include "bgm.h"
 
 static std::array<uint8_t, 8> alive_heartbeat_code = {0x7F, 0xC0, 0xFF, 0xFF, 0x00, 0x80, 0xBD, 0x7E};
 static std::array<uint8_t, 8> sleep_heartbeat_code = {0x7F, 0xC0, 0xFF, 0xFF, 0x00, 0x00, 0x3D, 0x7E};
@@ -39,6 +40,7 @@ public:
     void registerRelayOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel, const std::vector<uint16_t> link_dids, const std::vector<uint16_t> repel_dids);
     void registerDryContactOut(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel, const std::vector<uint16_t> link_dids, const std::vector<uint16_t> repel_dids);
     void registerDoorbell(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel);
+    void registerBGM(uint16_t did, const std::string& name, const std::string& carry_state);
     void registerActionGroup(uint16_t aid, const std::string& name, bool is_mode, std::vector<AtomicAction> actions);
 
     void registerPanelKeyInput(uint16_t iid, const std::string& name, std::set<InputTag> tags, uint8_t pid, uint8_t bid, std::vector<std::unique_ptr<ActionGroup>>&& action_groups);
@@ -79,6 +81,9 @@ public:
     // ================ 空调 ================
     void updateAirState(uint8_t states, uint8_t temps);
     void updateRoomTemp(uint8_t air_id, uint8_t room_temp);
+    
+    // ================ 背景音乐 ================
+    void handleBGMModeChange(BGMMode mode);
     
     // ================ 获得物理上的继电器与干接点输入状态 ================
     void syncAllRelayPhysicsOnoff();

@@ -25,6 +25,19 @@
 #define AIR_CON_REPORT      0x08        // 空调响应
 #define INFRARED_CONTEROLLER 0x77       // 红外控制器, 就是空调遥控
 
+#define BGM_CON             0xA8        // 设备类型: 蓝牙背景音乐主机
+#define BGM_CON_PLAY_AND_PAUSE 0x0C     // 播放/暂停
+#define BGM_CON_PLAY        0x02        // 播放
+#define BGM_CON_STOP        0x03        // 停止
+#define BGM_CON_PREV        0x04        // 上一首
+#define BGM_CON_NEXT        0x05        // 下一首
+#define BGM_CON_VOLUME_UP   0x07        // 音量加
+#define BGM_CON_VOLUME_DOWN 0x08        // 音量减
+#define BGM_CON_BL_OPEN     0x0A        // 打开蓝牙模式
+#define BGM_CON_BL_CLOSE    0x0B        // 关闭蓝牙模式
+#define BGM_REPORT_MODE_BL  0x1A        // 报告说进入蓝牙模式
+#define BGM_REPORT_MODE_TF  0x19        // 报告说进入TF模式
+
 #define ORACLE              0x79        // esp32测试相关
 #define ALL_TIME_SYNC       0x78        // 广播时间
 #define VOICE_CONTROL       0x80        // 语音控制

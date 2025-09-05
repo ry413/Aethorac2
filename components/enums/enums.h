@@ -2,6 +2,14 @@
 
 // 这个理应与Laminor2的DeviceType顺序一样
 enum class DeviceType {
+  // 预设设备类型
+  HEARTBEAT,
+  ROOM_STATE,
+  DELAYER,
+  ACTION_GROUP_OP,
+  SNAPSHOT,
+  INDICATOR,
+
   LAMP,
   CURTAIN,
   INFRARED_AIR,
@@ -10,14 +18,8 @@ enum class DeviceType {
   RELAY,
   DRY_CONTACT,
   DOORBELL,
+  BGM,
 
-  // 预设设备类型
-  HEARTBEAT,
-  ROOM_STATE,
-  DELAYER,
-  ACTION_GROUP_OP,
-  SNAPSHOT,
-  INDICATOR,
   NONE = 255
 };
 

@@ -15,6 +15,8 @@
 #include "stm32_tx.h"
 #include "stm32_rx.h"
 #include "identity.h"
+#include <bgm.h>
+#include <indicator.h>
 
 #define TAG "RS485"
 
@@ -241,6 +243,18 @@ void handle_rs485_data(uint8_t* data, int length) {
             
         }
     }
+    // 背景音乐
+    else if (data[1] == BGM_CON) {
+        // 因为背景音乐可能会自己变模式, 所以这里收到变化后直接更新按键指示灯
+        if (data[5] == BGM_REPORT_MODE_BL) {
+            lord.handleBGMModeChange(BGMMode::BL);
+            IndicatorHolder::getInstance().callAllAndClear();
+        } else if (data[5] == BGM_REPORT_MODE_TF) {
+            lord.handleBGMModeChange(BGMMode::TF);
+            IndicatorHolder::getInstance().callAllAndClear();
+        }
+    }
+    
     // 神谕
     else if (data[1] == ORACLE) {
         // 处理接收wifi ssid和pass包, 一堆包, data[2]为0x7?的都是

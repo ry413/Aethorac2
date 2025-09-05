@@ -11,6 +11,7 @@
 #include "relay_out.h"
 #include "drycontact_out.h"
 #include "my_mqtt.h"
+#include <bgm.h>
 
 #define TAG "PRESET_DEVICE"
 static bool have_spanshot = false;                                  // 是否有可用的快照
@@ -125,6 +126,11 @@ void PresetDevice::execute(std::string operation, std::string parameter, ActionG
                     if (dynamic_cast<PresetDevice*>(dev) != nullptr) {
                         continue;
                     }
+                    // 通过背景音乐
+                    if (dynamic_cast<BGM*>(dev) != nullptr) {
+                        continue;
+                    }
+
                     all_device_onoff_snapshot[dev->getDid()] = dev->isOn();
                 }
                 room_alive_snapshot = lord.getAlive();

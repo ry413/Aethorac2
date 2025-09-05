@@ -13,6 +13,7 @@
 #include "relay_out.h"
 #include "drycontact_out.h"
 #include <stm32_rx.h>
+#include <bgm.h>
 
 #define TAG "LORD_MANAGER"
 
@@ -64,6 +65,11 @@ void LordManager::registerDryContactOut(uint16_t did, const std::string& name, c
 
 void LordManager::registerDoorbell(uint16_t did, const std::string& name, const std::string& carry_state, uint8_t channel) {
     auto dev = std::make_unique<SingleRelayDevice>(did, DeviceType::DOORBELL, name, carry_state, channel, readRelayPhysicsState(channel));
+    devices_map[dev->getDid()] = std::move(dev);
+}
+
+void LordManager::registerBGM(uint16_t did, const std::string& name, const std::string& carry_state) {
+    auto dev = std::make_unique<BGM>(did, DeviceType::BGM, name, carry_state);
     devices_map[dev->getDid()] = std::move(dev);
 }
 
@@ -196,6 +202,12 @@ void LordManager::updateRoomTemp(uint8_t air_id, uint8_t room_temp) {
         if (air->getAcId() == air_id) {
             air->update_room_temp(room_temp);
         }
+    }
+}
+
+void LordManager::handleBGMModeChange(BGMMode mode) {
+    for (auto* bgm : getDevicesByType<BGM>()) {
+        bgm->changeMode(mode);
     }
 }
 

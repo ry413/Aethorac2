@@ -3,6 +3,6 @@ idf_component_register(
     INCLUDE_DIRS "."
     REQUIRES enums action_group stm32_comm
     iinput channel_input panel_input voice_command room_state
-    idevice preset_device lamp curtain air_conditioner rs485_command relay_out drycontact_out
+    idevice preset_device lamp curtain air_conditioner rs485_command relay_out drycontact_out bgm
     esp_timer
 )
